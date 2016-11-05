@@ -5,12 +5,13 @@ const CLIAM_TIME = 1000*60*2;
 const CLAIM_DIR = "servers";
 const DESTROY_TIME = 1000*60*5;
 const BOT_CHANNEL = "zktest";
+const CHECK_SERVERS_STATUS_INTERVAL = 1000*5;
 
 var RtmClient = slack.RtmClient;
 var CLIENT_EVENTS = slack.CLIENT_EVENTS;
 var RTM_EVENTS = slack.RTM_EVENTS;
 var MemoryDataStore = slack.MemoryDataStore;
-var token = process.env.SLACK_API_TOKEN ;
+var token = process.env.SLACK_API_TOKEN;
 
 var rtm = new RtmClient(token, {
   logLevel: 'error', // check this out for more on logger: https://github.com/winstonjs/winston
@@ -137,7 +138,14 @@ function listServers() {
 	return result.join('\n');
 }
 
-function checkServers() {
+//-----------------------------------------------------------
+function checkServersLoop() {
+	if (!rtm.connected) {
+		console.log('checkServersLoop: not connected');
+		return;
+	}
+	console.log('checkServersLoop: do the job');
+
 	var datas = readServersData();
 	var result = [];
 	var current_time = Date.now();
@@ -151,10 +159,10 @@ function checkServers() {
 			destroyServerByBot(data.server, data);
 		}
 	}
-	console.log('loop');
 }
-setInterval(checkServers, 1000);
+setInterval(checkServersLoop, CHECK_SERVERS_STATUS_INTERVAL);
 
+//-----------------------------------------------------------
 function freeServerByBot(server, data) {
 	if (data.owner) {
 		var lastowner = data.owner;
@@ -164,6 +172,7 @@ function freeServerByBot(server, data) {
 	}
 }
 
+//-----------------------------------------------------------
 function freeServerByBot(server, data) {
 	if (data.server_created_timestamp) {
 		destroyServerWebhook(server);
