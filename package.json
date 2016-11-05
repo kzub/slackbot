@@ -10,7 +10,8 @@
   "license": "MIT",
   "repository": "",
   "dependencies": {
-    "request": "^v2.64.0"
+    "request": "^v2.64.0",
+    "@slack/client": "^3.6.0"
   },
   "engines": {
     "node": ">= 0.10.x",

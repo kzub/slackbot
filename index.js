@@ -1,4 +1,4 @@
-var slack = require('../node-slack-sdk');
+var slack = require('@slack/client');
 var fs = require('fs');
 var request = require('request');
 
