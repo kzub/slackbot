@@ -50,6 +50,8 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
         result = unClaimServer(data.params[0], slackuser); break;
       case 'list':
         result = listServers(); break;
+      case 'help':
+        result = printHelp(); break;
       default:
         result = 'unknown command';
     }
@@ -144,6 +146,13 @@ function listServers() {
   }
 
   return result.join('\n');
+}
+
+//-----------------------------------------------------------
+function printHelp() {
+  return BOT_NAME + " list\n" +
+         BOT_NAME + " get <server>\n" +
+         BOT_NAME + " free <server>\n";
 }
 
 //-----------------------------------------------------------
