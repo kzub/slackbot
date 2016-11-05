@@ -1,0 +1,19 @@
+{
+  "name": "devsandboxbot",
+  "version": "1.0.0",
+  "description": "Master of devsandbox",
+  "main": "./index",
+  "scripts": {
+    "run": "./start.sh"    
+  },
+  "author": "Zubkov Konsatntin",
+  "license": "MIT",
+  "repository": "",
+  "dependencies": {
+    "request": "^v2.64.0"
+  },
+  "engines": {
+    "node": ">= 0.10.x",
+    "npm": ">= 1.1.x"
+  }
+}
