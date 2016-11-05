@@ -39,7 +39,7 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
 
     var data = parseMessage(message.text);
     if (!data) {
-      console.log('no cmd');
+      // console.log('no cmd');
       return;
     }
 
