@@ -29,22 +29,16 @@ rtm.on(CLIENT_EVENTS.RTM.AUTHENTICATED, function handleRTMAuthenticated() {
 rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
   var result;
   try {
-    // console.log(message);
     if (!message.user || !message.text) {
       return;
     }
-
-    var userobj = rtm.dataStore.getUserById(message.user);
-    if (!userobj) {
+    var slackuser = getSlackUser(message.user);
+    if (!slackuser) {
       return;
     }
-    var slackuser = userobj.name;
-    // var slackchannel = rtm.dataStore.getChannelGroupOrDMById(message.channel).name;
-    // console.log('User %s posted a message in %s channel', slackuser, slackchannel);
 
     var data = parseMessage(message.text);
     if (!data) {
-      // console.log('no cmd');
       return;
     }
 
@@ -67,6 +61,15 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
 
   rtm.sendMessage(result, message.channel);
 });
+
+//-----------------------------------------------------------
+function getSlackUser(user) {
+  var userobj = rtm.dataStore.getUserById(user);
+  if (!userobj) {
+    return;
+  }
+  return userobj.name;
+}
 
 //-----------------------------------------------------------
 function claimServer(server, slackuser) {
@@ -289,8 +292,8 @@ function parseMessage(message) {
   if (message[0] === '<' && message[1] === '@') {
     var username_end = message.indexOf('>');
     var user = message.slice(2, username_end);
-    var slackuser = rtm.dataStore.getUserById(user).name;
-    if (slackuser.indexOf(BOT_NAME) !== 0) {
+    var slackuser = getSlackUser(user);
+    if (!slackuser || slackuser.indexOf(BOT_NAME) !== 0) {
       return;
     }
   }
