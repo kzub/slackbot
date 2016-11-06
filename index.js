@@ -132,16 +132,21 @@ function unClaimServer(server, slackuser) {
 }
 
 //-----------------------------------------------------------
+function compareServerName(objA, objB) {
+  if (objA.server < objB.server) {
+    return -1;
+  } else if (objA.server > objB.server) {
+    return +1;
+  } else {
+    return 0;
+  }
+}
+
+//-----------------------------------------------------------
 function listServers() {
   var datas = readServersData();
   var result = [];
   var current_time = Date.now();
-
-  datas.sort(function (a, b) {
-    if (a < b) { return -1; }
-    else if (a > b) { return 1; }
-    else return 0;
-  });
 
   for (var idx in datas) {
     var data = datas[idx];
@@ -254,15 +259,16 @@ function readServersData() {
 
     try {
       data = JSON.parse(data);
-    } catch(e) {
-      console.error(e);
-      throw 'Internal error while reading: ' + server;
+    } catch(err) {
+      console.error('Internal error while reading: ' + server, err);
+      continue;
     }
 
     data.server = server;
     result.push(data);
   }
 
+  result.sort(compareServerName);
   return result;
 }
 
