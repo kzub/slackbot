@@ -4,10 +4,10 @@ var request = require('request');
 
 const BOT_NAME = "zuma";
 const BOT_CHANNEL = "zumatest";
-const CLIAM_TIME = 1000*60*2;
 const CLAIM_DIR = "servers";
+const CLIAM_TIME = 1000*60*2;
 const DESTROY_TIME = 1000*60*2;
-const CHECK_SERVERS_STATUS_INTERVAL = 1000*1;
+const CHECK_SERVERS_STATUS_INTERVAL = 1000*10;
 
 var RtmClient = slack.RtmClient;
 var CLIENT_EVENTS = slack.CLIENT_EVENTS;
@@ -30,10 +30,15 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
   var result;
   try {
     // console.log(message);
-    if (!message.user) {
+    if (!message.user || !message.text) {
       return;
     }
-    var slackuser = rtm.dataStore.getUserById(message.user).name;
+
+    var userobj = rtm.dataStore.getUserById(message.user);
+    if (!userobj) {
+      return;
+    }
+    var slackuser = userobj.name;
     // var slackchannel = rtm.dataStore.getChannelGroupOrDMById(message.channel).name;
     // console.log('User %s posted a message in %s channel', slackuser, slackchannel);
 
