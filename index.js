@@ -2,10 +2,12 @@ var slack = require('@slack/client');
 var fs = require('fs');
 var request = require('request');
 
-const BOT_NAME = "zuma";
-const BOT_CHANNEL = "zumatest";
-const CLAIM_DIR = "servers";
+const BOT_NAME = "zina";
+const BOT_CHANNEL = "zinatest";
+const SERVERSLIST_DIR = "servers";
+const INFO_DIR = "info";
 const CLIAM_TIME = 1000*60*2;
+// const CLIAM_TIME = 1000*60*60*48;
 const DESTROY_TIME = 1000*60*2;
 const CHECK_SERVERS_STATUS_INTERVAL = 1000*10;
 
@@ -27,11 +29,11 @@ rtm.on(CLIENT_EVENTS.RTM.AUTHENTICATED, function handleRTMAuthenticated() {
 });
 
 rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
-  var result;
   try {
     if (!message.user || !message.text) {
       return;
     }
+
     var slackuser = getSlackUser(message.user);
     if (!slackuser) {
       return;
@@ -42,24 +44,30 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
       return;
     }
 
+    var context = {
+      slackuser: slackuser,
+      write: function(msg){
+        rtm.sendMessage(msg, message.channel);
+      }
+    };
     switch (data.cmd) {
       case 'get':
-        result = claimServer(data.params[0], slackuser); break;
+        context.server = data.params[0];
+        claimServer(context); break;
       case 'free':
-        result = unClaimServer(data.params[0], slackuser); break;
+        context.server = data.params[0];
+        unClaimServer(context); break;
       case 'list':
-        result = listServers(); break;
+        listServers(context); break;
       case 'help':
-        result = printHelp(); break;
-      default:
-        result = 'unknown command';
+        printHelp(context); break;
+      default: throw 'unknown command';
     }
   } catch(err) {
-    console.error(err);
-    result = typeof(err) === "string" ? err : "Internal error";
+    console.error(err, err.stack);
+    var result = typeof(err) === "string" ? err : "Internal error";
+    context.write("<@" + slackuser + '> ' + result);
   }
-
-  rtm.sendMessage(result, message.channel);
 });
 
 //-----------------------------------------------------------
@@ -72,63 +80,65 @@ function getSlackUser(user) {
 }
 
 //-----------------------------------------------------------
-function claimServer(server, slackuser) {
-  var data = readServerData(server);
-  var current_time = Date.now();
-  var userchange = data.owner && data.owner != slackuser;
-  var lastowner = data.owner;
-  var serverbuild;
+function claimServer(context) {
+  var data = readServerData(context.server);
 
-  if (data.valid_till_timestamp && slackuser !== data.owner) {
+  var current_time = Date.now();
+  if (data.valid_till_timestamp && context.slackuser !== data.owner) {
     if(current_time < data.valid_till_timestamp) {
-      return 'ERROR. ' + server + ' is owned by <@' + data.owner + '> till ' +
-             getDateFromTimestamp(data.valid_till_timestamp);
+      context.write('ERROR. ' + context.server + ' is owned by <@' + data.owner + '> till ' +
+             getDateFromTimestamp(data.valid_till_timestamp));
+      return;
     }
   }
+
+  var userchange = data.owner && data.owner != context.slackuser;
+  var last_owner = data.owner;
+  data.valid_till_timestamp = getClaimTimeRight(data.claim_time_override);
+  data.owner = context.slackuser;
+  writeServerData(context.server, data);
+
+  var result = context.server + ' is yours <@' + data.owner + '> till ' +
+               getDateFromTimestamp(data.valid_till_timestamp);
+  if (userchange) {
+    result += "\n<@" + last_owner + "> lost ownership\n";
+  }
+  context.write(result);
 
   if (!data.server_created_timestamp) {
     data.server_created_timestamp = Date.now();
-    if (data.webhook_create_server) {
-      webhook_create_server(data.webhook_create_server);
-      serverbuild = true;
+    if (data.config.webhook_create_server) {
+      webhook_create_server(context, data.config.webhook_create_server, function(err) {
+        if (!err) {
+          // update server creation time
+          writeServerData(context.server, data);
+        }
+      });
     }
   }
-
-  data.valid_till_timestamp = current_time + CLIAM_TIME;
-  data.owner = slackuser;
-  writeServerData(server, data);
-
-  var result = 'OK. ' + server + ' is yours <@' + data.owner + '> till ' +
-               getDateFromTimestamp(data.valid_till_timestamp);
-  if (userchange) {
-    result += "\n<@" + lastowner + "> lost ownership\n";
-  }
-  if (serverbuild) {
-    result += '\nJenkins started to deploy new server...';
-  }
-  return result;
 }
 
 //-----------------------------------------------------------
-function unClaimServer(server, slackuser) {
-  var data = readServerData(server);
+function unClaimServer(context) {
+  var data = readServerData(context.server);
   var current_time = Date.now();
   var expired = data.valid_till_timestamp < current_time;
-  var lastowner = data.owner;
+  var last_owner = data.owner;
 
-  if (!expired && slackuser !== data.owner) {
-    return 'ERROR. ' + server + ' is owned by <@' + data.owner + '>';
+  if (!expired && context.slackuser !== data.owner) {
+    context.write('ERROR. ' + context.server + ' is owned by <@' + data.owner + '>');
+    return;
   }
 
   data.valid_till_timestamp = current_time;
   data.owner = undefined;
-  writeServerData(server, data);
+  writeServerData(context.server, data);
 
-  var result = 'OK. ' + server + ' is free';
-  if (lastowner) {
-    result += '\n<@' + lastowner + '> lost ownership';
+  var result = context.server + ' is free';
+  if (last_owner) {
+    result += '\n<@' + last_owner + '> lost ownership';
   }
-  return result;
+  context.write(result);
 }
 
 //-----------------------------------------------------------
@@ -143,7 +153,7 @@ function compareServerName(objA, objB) {
 }
 
 //-----------------------------------------------------------
-function listServers() {
+function listServers(context) {
   var datas = readServersData();
   var result = [];
   var current_time = Date.now();
@@ -158,14 +168,16 @@ function listServers() {
     }
   }
 
-  return result.join('\n');
+  context.write(result.join('\n'));
 }
 
 //-----------------------------------------------------------
-function printHelp() {
-  return BOT_NAME + " list\n" +
+function printHelp(context) {
+  context.write(
+         BOT_NAME + " list\n" +
          BOT_NAME + " get <server>\n" +
-         BOT_NAME + " free <server>\n";
+         BOT_NAME + " free <server>\n"
+  );
 }
 
 //-----------------------------------------------------------
@@ -220,51 +232,81 @@ function destroyServerByBot(server, data, channelId) {
     data.server_created_timestamp = undefined;
     writeServerData(server, data);
 
-    if (data.webhook_destroy_server) {
-      webhook_destroy_server(data.webhook_destroy_server);
-      rtm.sendMessage(server + " being destroyed by Jenkins\n", channelId);
+    if (data.config.webhook_destroy_server) {
+      var context = {
+        server: server,
+        write: function (msg) {
+          rtm.sendMessage(msg, channelId);
+        }
+      };
+      webhook_destroy_server(context, data.config.webhook_destroy_server);
     }
   }
 }
 
 //-----------------------------------------------------------
+function webhook_create_server(context, url, callback) {
+  context.write('Jenkins: ' + context.server + ' being created...');
+  request(url, function(err, data) {
+    if (err) {
+      context.write('Jenkins: ' + context.server + ' CREATING ERROR!');
+      console.log('webhook_create_server ERR', err);
+    } else {
+      context.write('Jenkins: ' + context.server + ' created!');
+    }
+    if (callback) { callback(err); }
+  });
+}
+
+function webhook_destroy_server(context, url) {
+  context.write('Jenkins: ' + context.server + ' being destroyed...');
+  request(url, function(err, data) {
+    if (err) {
+      context.write('Jenkins: ' + context.server + ' DESTROYING ERROR!');
+      console.log('webhook_destroy_server ERR', context.server, url, err);
+    } else {
+      context.write('Jenkins: ' + context.server + ' demolished!');
+    }
+  });
+}
+
+//-----------------------------------------------------------
 function readServerData(server) {
-  var serversList = fs.readdirSync(CLAIM_DIR);
-  if (serversList.indexOf(server) === -1) {
-    throw 'Unknown server: ' + server;
-  }
-
-  var serverFileName = [CLAIM_DIR, server].join('/');
-  var data = fs.readFileSync(serverFileName);
-
+  var data = {};
   try {
-    data = JSON.parse(data);
+    var serverFileName = [SERVERSLIST_DIR, server].join('/');
+    data.config = JSON.parse(fs.readFileSync(serverFileName));
   } catch(e) {
+    if (e.code === 'ENOENT') {
+      throw 'Unknown server: ' + server;
+    }
     console.error(e);
     throw 'Internal error while reading: ' + server;
   }
 
+  try {
+    var infoFileName = [INFO_DIR, server].join('/');
+    var info = JSON.parse(fs.readFileSync(infoFileName));
+    for (var key in info){
+      data[key] = info[key];
+    }
+  } catch(e) {
+    if (e.code !== 'ENOENT') {
+      console.error('error reading info:', server, e);
+    }
+  }
+  data.server = server;
   return data;
 }
 
 //-----------------------------------------------------------
 function readServersData() {
-  var serversList = fs.readdirSync(CLAIM_DIR);
+  var serversList = fs.readdirSync(SERVERSLIST_DIR);
   var result = [];
 
   for (var idx in serversList) {
     var server = serversList[idx];
-    var serverFileName = [CLAIM_DIR, server].join('/');
-    var data = fs.readFileSync(serverFileName);
-
-    try {
-      data = JSON.parse(data);
-    } catch(err) {
-      console.error('Internal error while reading: ' + server, err);
-      continue;
-    }
-
-    data.server = server;
+    var data = readServerData(server);
     result.push(data);
   }
 
@@ -274,23 +316,12 @@ function readServersData() {
 
 //-----------------------------------------------------------
 function writeServerData(server, data) {
-  var serverFileName = [CLAIM_DIR, server].join('/');
-  fs.writeFileSync(serverFileName, JSON.stringify(data));
+  var serverFileName = [INFO_DIR, server].join('/');
+  var dataCopy = JSON.parse(JSON.stringify(data));
+  delete dataCopy.config;
+  fs.writeFileSync(serverFileName, JSON.stringify(dataCopy));
 }
 
-//-----------------------------------------------------------
-function webhook_create_server(url) {
-  request(url);
-  console.log('CREATE SERVER webhook', url);
-}
-function webhook_destroy_server(url) {
-  request(url);
-  console.log('DESTROY SERVER webhook', url);
-}
-//-----------------------------------------------------------
-function getDateFromTimestamp(timestamp) {
-  return new Date(timestamp).toJSON().slice(0,19).replace('T',' ') + ' (GMT)';
-}
 //-----------------------------------------------------------
 function parseMessage(message) {
   if (!message) return;
@@ -313,6 +344,25 @@ function parseMessage(message) {
     cmd: parts[1],
     params: parts.slice(2)
   };
+}
+
+//-----------------------------------------------------------
+function getClaimTimeRight(claimTimeOverride) {
+  if (!isFinite(claimTimeOverride)){
+    claimTimeOverride = undefined;
+  }
+  var claimTime = new Date(Date.now() + (claimTimeOverride || CLIAM_TIME));
+  var day_of_week = claimTime.getDay();
+  // weekends are not counted
+  if (day_of_week === 0 || day_of_week === 6) {
+    claimTime.setHours(claimTime.getHours() + 48);
+  }
+  return claimTime.valueOf();
+}
+
+//-----------------------------------------------------------
+function getDateFromTimestamp(timestamp) {
+  return new Date(timestamp).toJSON().slice(0,19).replace('T',' ') + ' (GMT)';
 }
 
 
