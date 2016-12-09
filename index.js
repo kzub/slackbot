@@ -94,7 +94,11 @@ function claimServer(context) {
 
   var userchange = data.owner && data.owner != context.slackuser;
   var last_owner = data.owner;
-  data.valid_till_timestamp = getClaimTimeRight(data.claim_time_override);
+  var claim_time_override;
+  if (data.config.acquire_infinitely) {
+    claim_time_override = new Date('2020-02-02').valueOf();
+  }
+  data.valid_till_timestamp = getClaimTimeRight(claim_time_override);
   data.owner = context.slackuser;
   writeServerData(context.server, data);
 
