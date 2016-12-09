@@ -6,9 +6,9 @@ const BOT_NAME = "zina";
 const BOT_CHANNEL = "zinatest";
 const SERVERSLIST_DIR = "servers";
 const INFO_DIR = "info";
-const CLIAM_TIME = 1000*60*2;
-// const CLIAM_TIME = 1000*60*60*48;
-const DESTROY_TIME = 1000*60*2;
+// const CLIAM_TIME = 1000*60*2;
+const CLIAM_TIME = 1000*60*60*48;
+const DESTROY_TIME = 1000*60*60;
 const CHECK_SERVERS_STATUS_INTERVAL = 1000*10;
 
 var RtmClient = slack.RtmClient;
