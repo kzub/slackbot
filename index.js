@@ -3,7 +3,7 @@ var fs = require('fs');
 var request = require('request');
 
 const BOT_NAME = "zina";
-const BOT_CHANNEL = "zinatest";
+const BOT_CHANNEL = "claim_channel";
 const SERVERSLIST_DIR = "servers";
 const INFO_DIR = "info";
 // const CLIAM_TIME = 1000*60*2;
