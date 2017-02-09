@@ -15,7 +15,7 @@ var rtm = new RtmClient(token, {
 rtm.start();
 
 rtm.on(CLIENT_EVENTS.RTM.AUTHENTICATED, function handleRTMAuthenticated() {
-  console.log('RTM client authenticated!');
+  console.log('RTM client authenticated!', new Date());
 });
 
 var channelsMap = {};
