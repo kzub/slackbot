@@ -83,6 +83,11 @@ function getSlackUser(user) {
 function claimServer(context) {
   var data = readServerData(context.server);
 
+  if (context.server.indexOf('dev-linode') > -1){
+      context.write('ERROR. ' + context.server + ' depricated. Use sandbox-**');
+      return;
+  }
+
   var current_time = Date.now();
   if (data.valid_till_timestamp && context.slackuser !== data.owner) {
     if(current_time < data.valid_till_timestamp) {
