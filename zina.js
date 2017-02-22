@@ -84,7 +84,7 @@ function claimServer(context) {
   var data = readServerData(context.server);
 
   if (context.server.indexOf('dev-linode') > -1){
-      context.write('ERROR. ' + context.server + ' depricated. Use sandbox-**');
+      context.write('ERROR. ' + context.server + ' outdated. Use sandbox-**');
       return;
   }
 
