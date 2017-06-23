@@ -116,6 +116,9 @@ function processAdminMessage(message, msgChannelId) {
     }
 
     delete config.protect[channel][name];
+    if (Object.keys(config.protect[channel]).length == 0){
+      delete config.protect[channel];
+    }
     fs.writeFileSync(configName, JSON.stringify(config));
     rtm.sendMessage("ok", msgChannelId);
   }
