@@ -1,3 +1,4 @@
 servers/*
 start.sh
 node_modules
+guardian.conf
