@@ -45,9 +45,9 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
       console.log("error getting channel", message);
       return;
     }
-    console.log(channel, slackuser, message.text);
+    console.log(channel, slackuser, 'thread:' + Boolean(message.thread_ts), message.text);
 
-    if (!config.protect[channel] || config.protect[channel][slackuser]) {
+    if (!config.protect[channel] || config.protect[channel][slackuser] || message.thread_ts /*threads allowed*/) {
       return;
     }
 
