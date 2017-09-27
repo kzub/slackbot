@@ -24,9 +24,19 @@ var rtm = new RtmClient(token, {
 
 rtm.start();
 
-rtm.on(CLIENT_EVENTS.RTM.AUTHENTICATED, function handleRTMAuthenticated() {
-  console.log('RTM client authenticated!');
+var rtmData;
+rtm.on(CLIENT_EVENTS.RTM.AUTHENTICATED, function handleRTMAuthenticated(rtmStartData) {
+  console.log('RTM client authenticated!'/*, Object.keys(rtmStartData)*/);
+  rtmData = rtmStartData;
 });
+
+function getDirectMsgChannel(userId) {
+  for (var i in rtmData.ims){
+    if (rtmData.ims[i].user == userId) {
+      return rtmData.ims[i].id;
+    }
+  }
+}
 
 rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
   try {
@@ -46,6 +56,7 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
 
     var context = {
       slackuser: slackuser,
+      slackuserDM: getDirectMsgChannel(message.user),
       write: function(msg){
         rtm.sendMessage(msg, message.channel);
       }
@@ -105,6 +116,8 @@ function claimServer(context) {
   }
   data.valid_till_timestamp = getClaimTimeRight(claim_time_override);
   data.owner = context.slackuser;
+  data.ownerDM = context.slackuserDM;
+
   writeServerData(context.server, data);
 
   var result = context.server + ' is yours <@' + data.owner + '> till ' +
@@ -229,9 +242,15 @@ setInterval(checkServersLoop, CHECK_SERVERS_STATUS_INTERVAL);
 function freeServerByBot(server, data, channelId) {
   if (data.owner) {
     var lastowner = data.owner;
+    var lastownerDM = data.ownerDM;
     data.owner = undefined;
+    data.ownerDM = undefined;
     writeServerData(server, data);
+
     rtm.sendMessage(server + " released by bot\n<@" + lastowner + "> lost ownership", channelId);
+    if (lastownerDM) {
+      rtm.sendMessage(server + " released by bot\n<@" + lastowner + "> lost ownership", lastownerDM);
+    }
   }
 }
 
