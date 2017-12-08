@@ -46,7 +46,8 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
       return;
     }
     if(config.users[slackuser]){
-      processUserMessage(message.text, message.channel)
+      console.log(slackuser + ' check user:' + message.text);
+      processUserMessage(message.text, message.channel);
       return;      
     }
 
@@ -107,9 +108,8 @@ function processAdminMessage(message, msgChannelId) {
 
 //-----------------------------------------------------------
 function checkUserAtSkud(username, callback){
-  console.log('checkUserAtSkud', username)
   const check = spawn('skud', [username]);
-  var output = new String;
+  var output = '';
 
   check.stdout.on('data', (data) => {
     output += data;
@@ -120,7 +120,7 @@ function checkUserAtSkud(username, callback){
   });
 
   check.on('close', (code) => {
-    callback(output == '' ? 'Не найден' : output);
+    callback(output === '' ? 'Не найден' : output);
   });  
 }
 
