@@ -46,7 +46,7 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
       return;
     }
     if(config.users[slackuser]){
-      console.log(slackuser + ' check user:' + message.text);
+      console.log(new Date().toJSON() + ' ' + slackuser + ' check user:' + message.text);
       processUserMessage(message.text, message.channel);
       return;      
     }
