@@ -120,7 +120,7 @@ function checkUserAtSkud(username, callback){
   });
 
   check.on('close', (code) => {
-    callback(output === '' ? 'Не найден' : output);
+    callback(output === '' ? 'Не найдено. Имена и фамилии, пишутся с большой буквы.' : output);
   });  
 }
 
