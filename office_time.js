@@ -109,7 +109,7 @@ function processAdminMessage(message, msgChannelId) {
 //-----------------------------------------------------------
 function checkUserAtSkud(username, callback){
   const check = spawn('skud', [username]);
-  var output = '```';
+  var output = '';
 
   check.stdout.on('data', (data) => {
     output += data;
@@ -120,7 +120,7 @@ function checkUserAtSkud(username, callback){
   });
 
   check.on('close', (code) => {
-    callback(output === '' ? 'Не найдено. Имена и фамилии, пишутся с большой буквы.' : output + '```');
+    callback(output === '' ? 'Не найдено. Имена и фамилии, пишутся с большой буквы.' : '```' + output + '```');
   });  
 }
 
