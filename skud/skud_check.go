@@ -94,13 +94,13 @@ func printDays(days map[string]int64, additionalInfo map[string]string) {
 
 func printWeeks(days map[string]int64) {
 	weeks := make(map[int]float32)
-	badHoursDetected := make(map[int]int)
+	badHoursDetected := make(map[int]string)
 
 	for day := range days {
 		week := getWeek(day)
 		dayHours, err := getDayHours(days[day])
 		if err {
-			badHoursDetected[week] = '*'
+			badHoursDetected[week] = ":rain_cloud:"
 		} else {
 			weeks[week] += dayHours
 		}
@@ -115,7 +115,7 @@ func printWeeks(days map[string]int64) {
 	for _, week := range sortedWeeks {
 		duration := weeks[week]
 		printTime := getHourFormat(duration)
-		fmt.Printf("week: %d  hours: %s%c\r\n", week, printTime, badHoursDetected[week])
+		fmt.Printf("week: %d  hours: %s %s\r\n", week, printTime, badHoursDetected[week])
 	}
 }
 
