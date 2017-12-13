@@ -3,3 +3,6 @@ info
 start.sh
 node_modules
 guardian.conf
+skud/skud
+skud/check.sh
+
