@@ -80,6 +80,12 @@ function processUserMessage(message, msgChannelId) {
     let response = [];
     let skud = result[0];
     let kt = result[1];
+
+    for(let date in kt){
+      response.push(`${date}  ${kt[date]}`);
+    }
+    response.reverse();
+
     let lines = skud.split('\r\n');
     for(let idx in lines){
       let line = lines[idx];
@@ -216,9 +222,10 @@ function keepteamSearchName(name, callback) {
     }
 
     try {
-      var data = JSON.parse(body);
-      if(data.Result && data.Result.length == 1) {
-        callback(undefined, data.Result[0]);
+      let data = JSON.parse(body);
+      let users = data.Result.filter(u => u.IsActive);
+      if(users.length == 1) {
+        callback(undefined, users[0]);
         return;
       }
       console.log('keepteamSearchName::info bad result length:', body);
