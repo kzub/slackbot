@@ -89,8 +89,8 @@ function processUserMessage(message, msgChannelId) {
       }
       response.push(line);
     }
-    console.log('```' + response.join('\r\n') + '```');
-    // rtm.sendMessage('```' + response.join('\r\n') + '```', msgChannelId);
+    // console.log('```' + response.join('\r\n') + '```');
+    rtm.sendMessage('```' + response.join('\r\n') + '```', msgChannelId);
   });
 }
 
