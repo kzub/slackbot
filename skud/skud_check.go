@@ -6,11 +6,13 @@ import (
 	_ "github.com/nakagami/firebirdsql"
 	"os"
 	"sort"
+	"strings"
 	"time"
 )
 
 func scanUsers(conn *sql.DB, name string) (res []string) {
 	// USER_ID AREA_ID USER_NAME AREA_NAME POSITION DEPT_ID DEPT PHONE MOBILE GROUP
+	fmt.Println(name)
 	rows, err := conn.Query("SELECT USER_ID, USER_NAME FROM V_USERS WHERE USER_NAME LIKE '%" + name + "%'")
 	if err != nil {
 		fmt.Println(err)
@@ -124,7 +126,7 @@ func main() {
 	defer conn.Close()
 
 	if len(os.Args) > 1 {
-		name := os.Args[1]
+		name := strings.Join(os.Args[1:], " ")
 		users := scanUsers(conn, name)
 		if len(users) == 1 {
 			viewUser(conn, users[0])
