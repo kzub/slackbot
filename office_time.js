@@ -15,6 +15,10 @@ const token2 = process.env.SLACK_API_TOKEN_LEGACY;
 const configName = 'office_time.conf';
 const KT_HOST = process.env.KT_HOST;
 
+if (!KT_HOST) {
+  console.log('No KT_HOST');
+  return;
+}
 //---------------------------------- SLACK BOT -----------------------------
 var rtm = new RtmClient(token, {
   logLevel: 'error', // check this out for more on logger: https://github.com/winstonjs/winston
