@@ -195,6 +195,7 @@ var keepteamHeaders = {
 };
 
 function keepteamAuth (callback) {
+  console.log('keepteam: make auth...');
   delete keepteamHeaders.Cookie;
   var options = {
     url: `https://${KT_HOST}/api/authentication/logon`,
