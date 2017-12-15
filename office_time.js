@@ -215,7 +215,7 @@ function keepteamAuth (callback) {
       console.log('Session - OK');
       callback();
     } else {
-      console.log('keepteamAuth::error', error, response && response.statusCode);
+      console.log('keepteam::Auth::error', error, response && response.statusCode);
       callback(error);
     }
   });
@@ -231,7 +231,7 @@ function keepteamSearchName(name, callback) {
 
   request(options, function (error, response, body) {
     if (response && response.statusCode != 200) {
-      console.log('keepteamSearchName::bad_status', error, response.statusCode);
+      console.log('keepteam::SearchName::bad_status', error, response.statusCode);
       callback('wrong_status_code', response.statusCode);
       return;
     }
@@ -243,10 +243,10 @@ function keepteamSearchName(name, callback) {
         callback(undefined, users[0]);
         return;
       }
-      console.log('keepteamSearchName::info bad result length');
+      console.log('keepteam::SearchName::info bad result length');
       callback('empty request');
     } catch (e) {
-      console.log('keepteamSearchName::error 2', e, body);
+      console.log('keepteam::SearchName::error 2', e, body);
       callback(e);
     }
   });
@@ -279,7 +279,7 @@ function checkUserAtKeepteam(name, callback, retry){
 
 function keepteamTimeOffs(user, callback){
   if(!user){
-    callback('keepteamTimeOffs::error nouser');
+    callback('keepteam::TimeOffs::error nouser');
     return;
   }
 
@@ -292,7 +292,7 @@ function keepteamTimeOffs(user, callback){
 
   request(options, (error, response, body) => {
     if (response && response.statusCode != 200) {
-      console.log('keepteamTimeOffs::error', error, response.statusCode);
+      console.log('keepteam::TimeOffs::error', error, response.statusCode);
       callback(error);
       return;
     }
@@ -301,7 +301,7 @@ function keepteamTimeOffs(user, callback){
     try {
       data = JSON.parse(body).Result;
     } catch (e) {
-      console.log('keepteamTimeOffs::error 2', e, body);
+      console.log('keepteam::TimeOffs::error 2', e, body);
       callback(e);
       return;
     }
