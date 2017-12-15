@@ -50,7 +50,12 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
     }
     if(config.users[slackuser]){
       console.log(new Date().toJSON() + ' ' + slackuser + ' check user:' + message.text);
-      processUserMessage(message.text, message.channel);
+      try{
+        processUserMessage(message.text, message.channel);
+      }
+      catch(e){
+        console.log('Exception:', e);
+      }
       return;
     }
 
@@ -80,6 +85,11 @@ function processUserMessage(message, msgChannelId) {
     let response = [];
     let skud = result[0];
     let kt = result[1];
+
+    if(!skud.length){
+      rtm.sendMessage('Не найдено. Имена и фамилии, пишутся с большой буквы.', msgChannelId);
+      return;
+    }
 
     for(let date in kt){
       response.push(`${date}  ${kt[date]}`);
@@ -172,7 +182,7 @@ function checkUserAtSkud(username, callback){
   });
 
   check.on('close', (code) => {
-    callback(undefined, output === '' ? 'Не найдено. Имена и фамилии, пишутся с большой буквы.' : output);
+    callback(undefined, output);
   });
 }
 
@@ -228,10 +238,10 @@ function keepteamSearchName(name, callback) {
         callback(undefined, users[0]);
         return;
       }
-      console.log('keepteamSearchName::info bad result length:', body);
+      console.log('keepteamSearchName::info bad result length');
       callback('empty request');
     } catch (e) {
-      console.log('keepteamSearchName::error 2', body);
+      console.log('keepteamSearchName::error 2');
       callback(e);
     }
   });
@@ -281,7 +291,7 @@ function keepteamTimeOffs(user, callback){
     try {
       data = JSON.parse(body).Result;
     } catch (e) {
-      console.log('keepteamTimeOffs::error 2', e);
+      console.log('keepteamTimeOffs::error 2');
       callback(e);
       return;
     }
