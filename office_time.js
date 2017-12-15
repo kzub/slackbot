@@ -241,7 +241,7 @@ function keepteamSearchName(name, callback) {
       console.log('keepteamSearchName::info bad result length');
       callback('empty request');
     } catch (e) {
-      console.log('keepteamSearchName::error 2');
+      console.log('keepteamSearchName::error 2', e, body);
       callback(e);
     }
   });
@@ -296,7 +296,7 @@ function keepteamTimeOffs(user, callback){
     try {
       data = JSON.parse(body).Result;
     } catch (e) {
-      console.log('keepteamTimeOffs::error 2');
+      console.log('keepteamTimeOffs::error 2', e, body);
       callback(e);
       return;
     }
