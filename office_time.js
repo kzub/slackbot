@@ -74,7 +74,7 @@ function processUserMessage(message, msgChannelId) {
     },
     (cb) => {
       checkUserAtKeepteam(message, (err, res) => {
-        cb(undefined, res || {});
+        cb(undefined, res || {})
       });
     }
   ], (err, result) =>{
@@ -205,12 +205,12 @@ function keepteamAuth (callback) {
 
   // console.log(options);
   request(options, function (error, response, body) {
-    if (response.statusCode == 204) {
+    if (response && response.statusCode == 204) {
       keepteamHeaders.Cookie = response.headers['set-cookie'][0];
       console.log('Session - OK');
       callback();
     } else {
-      console.log('keepteamAuth::error', error, response.statusCode);
+      console.log('keepteamAuth::error', error, response && response.statusCode);
       callback(error);
     }
   });
@@ -225,9 +225,9 @@ function keepteamSearchName(name, callback) {
   };
 
   request(options, function (error, response, body) {
-    if (response.statusCode != 200) {
+    if (response && response.statusCode != 200) {
       console.log('keepteamSearchName::bad_status', error, response.statusCode);
-      callback('wrong_status_code', response && response.statusCode);
+      callback('wrong_status_code', response.statusCode);
       return;
     }
 
@@ -273,6 +273,11 @@ function checkUserAtKeepteam(name, callback, retry){
 }
 
 function keepteamTimeOffs(user, callback){
+  if(!user){
+    callback('keepteamTimeOffs::error nouser');
+    return;
+  }
+
   var options = {
     url: `https://${KT_HOST}/api/TimeOffs/List`,
     method: 'POST',
@@ -281,7 +286,7 @@ function keepteamTimeOffs(user, callback){
   };
 
   request(options, (error, response, body) => {
-    if (response.statusCode != 200) {
+    if (response && response.statusCode != 200) {
       console.log('keepteamTimeOffs::error', error, response.statusCode);
       callback(error);
       return;
