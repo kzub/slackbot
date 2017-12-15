@@ -102,6 +102,7 @@ func printWeeks(days map[string]int64) {
 		dayHours, err := getDayHours(days[day])
 		if err {
 			badHoursDetected[week] = '*'
+			weeks[week] += 0 // if every day is broken week will absent in map
 		} else {
 			weeks[week] += dayHours
 		}
@@ -167,6 +168,10 @@ func getDay(time time.Time) string {
 }
 
 func addAbsentDates(sortedDays []string) []string {
+	if len(sortedDays) < 1 {
+		return sortedDays
+	}
+
 	sort.Strings(sortedDays)
 	min := getTime(sortedDays[0])
 	max := getTime(sortedDays[len(sortedDays)-1])
@@ -179,6 +184,10 @@ func addAbsentDates(sortedDays []string) []string {
 }
 
 func addAbsentWeeks(sortedWeeks []int) []int {
+	if len(sortedWeeks) < 1 {
+		return sortedWeeks
+	}
+
 	sort.Ints(sortedWeeks)
 	min := sortedWeeks[0]
 	max := sortedWeeks[len(sortedWeeks)-1]
