@@ -109,7 +109,12 @@ function processUserMessage(message, msgChannelId) {
       let line = lines[idx];
       let date = line.slice(0, 10);
       if(line.indexOf('----------') == 0){
+        let was = response.push(line);
         insertKTFutureDates(kt, lastDate, response)
+        if(was !== response.length){
+          response.push(line);
+        }
+        continue;
       }
       lastDate = date
       if(kt[date]){
@@ -130,7 +135,7 @@ function insertKTFutureDates(kt, lastDate, response){
               });
 
   dates.forEach(date => {
-    response.push(`${date}           ${kt[date]}`);
+    response.push(`${date}  ${kt[date]}`);
   });
 }
 

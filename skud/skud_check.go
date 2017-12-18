@@ -46,7 +46,7 @@ func viewUser(conn *sql.DB, userID string) {
 	}
 
 	printDays(days, additionalInfo)
-	fmt.Println("---------------------------------------------------------------------------")
+	fmt.Printf("---------------------------------------------------------------------------\r\n")
 	printWeeks(days)
 }
 
@@ -176,7 +176,7 @@ func addAbsentDates(sortedDays []string) []string {
 
 	sort.Strings(sortedDays)
 	min := getTime(sortedDays[0])
-	max := getTime(sortedDays[len(sortedDays)-1])
+	max := time.Now()
 
 	var newSortedDays []string
 	for ; !min.After(max); min = min.Add(time.Hour * 24) {
