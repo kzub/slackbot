@@ -19,6 +19,14 @@ if (!KT_HOST) {
   console.log('No KT_HOST');
   return;
 }
+
+var keepteamHeaders = {
+  'Content-Type': 'application/json; charset=utf-8',
+  'Accept': 'application/json, text/plain, */*',
+  'Referer': `https://${KT_HOST}/`,
+  'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36',
+};
+
 //---------------------------------- SLACK BOT -----------------------------
 var rtm = new RtmClient(token, {
   logLevel: 'error', // check this out for more on logger: https://github.com/winstonjs/winston
@@ -95,15 +103,15 @@ function processUserMessage(message, msgChannelId) {
       return;
     }
 
-    for(let date in kt){
-      response.push(`${date}  ${kt[date]}`);
-    }
-    response.reverse();
-
     let lines = skud.split('\r\n');
+    let lastDate;
     for(let idx in lines){
       let line = lines[idx];
       let date = line.slice(0, 10);
+      if(line.indexOf('----------') == 0){
+        insertKTFutureDates(kt, lastDate, response)
+      }
+      lastDate = date
       if(kt[date]){
         line += kt[date];
       }
@@ -113,6 +121,19 @@ function processUserMessage(message, msgChannelId) {
     rtm.sendMessage('```' + response.join('\r\n') + '```', msgChannelId);
   });
 }
+
+function insertKTFutureDates(kt, lastDate, response){
+  let last = new Date(lastDate + 'T00:00:00Z');
+  let dates = Object.keys(kt).filter(d => {
+                let date = new Date(d + 'T00:00:00Z');
+                return date > last;
+              });
+
+  dates.forEach(date => {
+    response.push(`${date}           ${kt[date]}`);
+  });
+}
+
 
 function processAdminMessage(message, msgChannelId) {
   const parts = message.split(' ');
@@ -191,13 +212,6 @@ function checkUserAtSkud(username, callback){
 }
 
 //---------------------------------- KEEPTEAM PART -----------------------------
-var keepteamHeaders = {
-  'Content-Type': 'application/json; charset=utf-8',
-  'Accept': 'application/json, text/plain, */*',
-  'Referer': `https://${KT_HOST}/`,
-  'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36',
-};
-
 function keepteamAuth (callback) {
   console.log('keepteam: make auth...');
   delete keepteamHeaders.Cookie;

@@ -24,7 +24,7 @@ func scanUsers(conn *sql.DB, name string) (res []string) {
 
 	for rows.Next() {
 		rows.Scan(&userID, &userName)
-		fmt.Println(userID, userName)
+		fmt.Println(userName)
 		res = append(res, userID)
 	}
 	return
@@ -46,6 +46,7 @@ func viewUser(conn *sql.DB, userID string) {
 	}
 
 	printDays(days, additionalInfo)
+	fmt.Println("---------------------------------------------------------------------------")
 	printWeeks(days)
 }
 
@@ -113,11 +114,12 @@ func printWeeks(days map[string]int64) {
 		sortedWeeks = append(sortedWeeks, week)
 	}
 	sortedWeeks = addAbsentWeeks(sortedWeeks)
+	sortedWeeks = sortedWeeks[2:]
 
 	for _, week := range sortedWeeks {
 		duration := weeks[week]
 		printTime := getHourFormat(duration)
-		fmt.Printf("week: %d  hours: %s %c\r\n", week, printTime, badHoursDetected[week])
+		fmt.Printf("week: %.2d hours: %s %c\r\n", week, printTime, badHoursDetected[week])
 	}
 }
 
