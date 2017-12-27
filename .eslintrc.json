@@ -1,11 +1,15 @@
 {
   "parserOptions": {
-    "sourceType": "script"
+    "ecmaVersion": 2017,
+    "sourceType": "script",
+    "ecmaFeatures": {
+      "jsx": false
+    }
   },
   "env": {
     "browser": false,
     "node": true,
-    "mocha": true
+    "mocha": false
   },
   "extends": "airbnb-base",
   "plugins": [
@@ -13,10 +17,16 @@
     "promise"
   ],
   "rules": {
-    "strict": [
+    "strict": "off",
+    "prefer-destructuring": "warn",
+    "no-use-before-define": [
       "error",
-      "global"
+      {
+        "functions": false
+      }
     ],
+    "no-restricted-syntax": "warn",
+    "guard-for-in": "warn",
     "object-curly-newline": "off",
     "one-var": "off",
     "function-paren-newline": "off",
