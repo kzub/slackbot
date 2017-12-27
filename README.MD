@@ -1,6 +1,6 @@
 ## Slack bots
 
-###Bots
+### Bots
 
 * Zina - bot for claiming developer's servers.
 * office time - for logging developer office time
@@ -27,7 +27,7 @@ json file format:
 }
 ```
 
-###Run
+### Run
 Run script `start.sh`:
 ```bash
 #/bin/bash
