@@ -1,115 +1,116 @@
-var slack = require('@slack/client');
-var fs = require('fs');
-var request = require('request');
+const slack = require('@slack/client');
+const fs = require('fs');
+const request = require('request');
 const { spawn } = require('child_process');
 
-var RtmClient = slack.RtmClient;
-var CLIENT_EVENTS = slack.CLIENT_EVENTS;
-var RTM_EVENTS = slack.RTM_EVENTS;
-var MemoryDataStore = slack.MemoryDataStore;
-var token = process.env.SLACK_API_TOKEN;
-var token2 = process.env.SLACK_API_TOKEN_LEGACY;
-var configName = 'office_time.conf';
+const RtmClient = slack.RtmClient;
+const CLIENT_EVENTS = slack.CLIENT_EVENTS;
+const RTM_EVENTS = slack.RTM_EVENTS;
+const MemoryDataStore = slack.MemoryDataStore;
+const token = process.env.SLACK_API_TOKEN;
+const token2 = process.env.SLACK_API_TOKEN_LEGACY;
+const configName = 'office_time.conf';
 
-var rtm = new RtmClient(token, {
+const rtm = new RtmClient(token, {
   logLevel: 'error', // check this out for more on logger: https://github.com/winstonjs/winston
-  dataStore: new MemoryDataStore() // pass a new MemoryDataStore instance to cache information
+  dataStore: new MemoryDataStore(), // pass a new MemoryDataStore instance to cache information
 });
 
 rtm.start();
 
-rtm.on(CLIENT_EVENTS.RTM.AUTHENTICATED, function handleRTMAuthenticated() {
+rtm.on(CLIENT_EVENTS.RTM.AUTHENTICATED, () => {
   console.log('RTM client authenticated!', new Date());
 });
 
-var channelsMap = {};
-var config = JSON.parse(fs.readFileSync(configName));
+const channelsMap = {};
+const config = JSON.parse(fs.readFileSync(configName));
 
-rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
+rtm.on(RTM_EVENTS.MESSAGE, (message) => {
   try {
     if (!message.user || !message.text) {
       return;
     }
 
-    var slackuser = getSlackUser(message.user);
+    const slackuser = getSlackUser(message.user);
     if (!slackuser) {
-      console.log("error getting slackuser", message);
+      console.log('error getting slackuser', message);
       return;
     }
-    var channel = getSlackChannel(message.channel);
+    const channel = getSlackChannel(message.channel);
     if (channel) {
       // not direct message
       return;
     }
 
-    if(config.admins[slackuser] && processAdminMessage(message.text, message.channel)){
+    if (config.admins[slackuser] && processAdminMessage(message.text, message.channel)) {
       return;
     }
-    if(config.users[slackuser]){
-      console.log(new Date().toJSON() + ' ' + slackuser + ' check user:' + message.text);
+    if (config.users[slackuser]) {
+      console.log(`${new Date().toJSON()} ${slackuser} check user:${message.text}`);
       processUserMessage(message.text, message.channel);
-      return;      
+      return;
     }
 
     rtm.sendMessage('¯\\_(ツ)_/¯', message.channel);
 
-  } catch(err) {
+  } catch (err) {
     console.error(err, err.stack);
   }
 });
 
 
 function processUserMessage(message, msgChannelId) {
-  checkUserAtSkud(message, function(result){
-    rtm.sendMessage(result, msgChannelId);    
+  checkUserAtSkud(message, (result) => {
+    rtm.sendMessage(result, msgChannelId);
   });
 }
 
 function processAdminMessage(message, msgChannelId) {
-  var parts = message.split(' ');
-  var cmd = parts[0];
-  var name = parts[1];
+  const parts = message.split(' ');
+  const cmd = parts[0];
+  const name = parts[1];
 
-  if (cmd == 'add'){
-    var user = rtm.dataStore.getUserByName(name);
+  if (cmd === 'add') {
+    const user = rtm.dataStore.getUserByName(name);
     if (!user) {
-      rtm.sendMessage("failed. unknown user " + name, msgChannelId);
+      rtm.sendMessage(`failed. unknown user ${name}`, msgChannelId);
       return true;
     }
 
     config.users[name] = true;
     fs.writeFileSync(configName, JSON.stringify(config));
-    rtm.sendMessage("ok", msgChannelId);
+    rtm.sendMessage('ok', msgChannelId);
     return true;
   }
 
-  if (cmd == 'list'){
-    var msg = [];
-    for (var user in config.users) {
+  if (cmd === 'list') {
+    const msg = [];
+    for (const user in config.users) {
       msg.push(user);
     }
     rtm.sendMessage(msg.join('\n'), msgChannelId);
     return true;
   }
 
-  if (cmd == 'del'){
-    var user = rtm.dataStore.getUserByName(name);
+  if (cmd === 'del') {
+    const user = rtm.dataStore.getUserByName(name);
     if (!user) {
-      rtm.sendMessage("failed. unknown user " + name, msgChannelId);
+      rtm.sendMessage(`failed. unknown user ${name}`, msgChannelId);
       return true;
     }
-    
+
     delete config.users[name];
     fs.writeFileSync(configName, JSON.stringify(config));
-    rtm.sendMessage("ok", msgChannelId);
+    rtm.sendMessage('ok', msgChannelId);
     return true;
   }
+  return false;
 }
 
 //-----------------------------------------------------------
-function checkUserAtSkud(username, callback){
+function checkUserAtSkud(username, callback) {
   const check = spawn('skud', [username]);
-  var output = '';
+  let output = '';
 
   check.stdout.on('data', (data) => {
     output += data;
@@ -120,26 +121,24 @@ function checkUserAtSkud(username, callback){
   });
 
   check.on('close', (code) => {
-    callback(output === '' ? 'Не найдено. Имена и фамилии, пишутся с большой буквы.' : '```' + output + '```');
-  });  
+    callback(output === '' ? 'Не найдено. Имена и фамилии, пишутся с большой буквы.' : `\`\`\`${output}\`\`\``);
+  });
 }
 
 //-----------------------------------------------------------
 function getSlackUser(user) {
-  var userobj = rtm.dataStore.getUserById(user);
+  const userobj = rtm.dataStore.getUserById(user);
   if (!userobj) {
-    return;
+    return null;
   }
   return userobj.name;
 }
 //-----------------------------------------------------------
 function getSlackChannel(channelId) {
-  var chanobj = rtm.dataStore.getChannelById(channelId);
+  const chanobj = rtm.dataStore.getChannelById(channelId);
   if (!chanobj) {
-    return;
+    return null;
   }
   return chanobj.name;
 }
-
-
 

@@ -1,65 +1,68 @@
-var slack = require('@slack/client');
-var fs = require('fs');
-var request = require('request');
+const slack = require('@slack/client');
+const fs = require('fs');
+const request = require('request');
 
-const BOT_NAME = "zina";
-const BOT_CHANNEL = "claim_channel";
-const SERVERSLIST_DIR = "servers";
-const INFO_DIR = "info";
+const BOT_NAME = 'zina';
+const BOT_CHANNEL = 'claim_channel';
+const SERVERSLIST_DIR = 'servers';
+const INFO_DIR = 'info';
 // const CLIAM_TIME = 1000*60*2;
-const CLIAM_TIME = 1000*60*60*48;
-const DESTROY_TIME = 1000*60*60;
-const CHECK_SERVERS_STATUS_INTERVAL = 1000*10;
+const CLIAM_TIME = 1000 * 60 * 60 * 48;
+const DESTROY_TIME = 1000 * 60 * 60;
+const CHECK_SERVERS_STATUS_INTERVAL = 1000 * 10;
 
-var RtmClient = slack.RtmClient;
-var CLIENT_EVENTS = slack.CLIENT_EVENTS;
-var RTM_EVENTS = slack.RTM_EVENTS;
-var MemoryDataStore = slack.MemoryDataStore;
-var token = process.env.SLACK_API_TOKEN;
+const RtmClient = slack.RtmClient;
+const CLIENT_EVENTS = slack.CLIENT_EVENTS;
+const RTM_EVENTS = slack.RTM_EVENTS;
+const MemoryDataStore = slack.MemoryDataStore;
+const token = process.env.SLACK_API_TOKEN;
 
-var rtm = new RtmClient(token, {
+const rtm = new RtmClient(token, {
   logLevel: 'error', // check this out for more on logger: https://github.com/winstonjs/winston
-  dataStore: new MemoryDataStore() // pass a new MemoryDataStore instance to cache information
+  dataStore: new MemoryDataStore(), // pass a new MemoryDataStore instance to cache information
 });
 
 rtm.start();
 
-var rtmData;
-rtm.on(CLIENT_EVENTS.RTM.AUTHENTICATED, function handleRTMAuthenticated(rtmStartData) {
-  console.log('RTM client authenticated!'/*, Object.keys(rtmStartData)*/);
+let rtmData;
+rtm.on(CLIENT_EVENTS.RTM.AUTHENTICATED, (rtmStartData) => {
+  console.log('RTM client authenticated!'/* , Object.keys(rtmStartData) */);
   rtmData = rtmStartData;
 });
 
 function getDirectMsgChannel(userId) {
-  for (var i in rtmData.ims){
-    if (rtmData.ims[i].user == userId) {
+  for (const i in rtmData.ims) {
+    if (rtmData.ims[i].user === userId) {
       return rtmData.ims[i].id;
     }
   }
+  return null;
 }
 
-rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
+rtm.on(RTM_EVENTS.MESSAGE, (message) => {
+  let context;
+  let slackuser;
   try {
     if (!message.user || !message.text) {
       return;
     }
 
-    var slackuser = getSlackUser(message.user);
+    slackuser = getSlackUser(message.user);
     if (!slackuser) {
       return;
     }
 
-    var data = parseMessage(message.text);
+    const data = parseMessage(message.text);
     if (!data) {
       return;
     }
 
-    var context = {
-      slackuser: slackuser,
+    context = {
+      slackuser,
       slackuserDM: getDirectMsgChannel(message.user),
-      write: function(msg){
+      write(msg) {
         rtm.sendMessage(msg, message.channel);
-      }
+      },
     };
     switch (data.cmd) {
       case 'get':
@@ -72,65 +75,65 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
         listServers(context); break;
       case 'help':
         printHelp(context); break;
-      default: throw 'unknown command';
+      default: throw new Error('unknown command');
     }
-  } catch(err) {
+  } catch (err) {
     console.error(err, err.stack);
-    var result = typeof(err) === "string" ? err : "Internal error";
-    context.write("<@" + slackuser + '> ' + result);
+    const result = typeof (err) === 'string' ? err : 'Internal error';
+    context.write(`<@${slackuser}> ${result}`);
   }
 });
 
 //-----------------------------------------------------------
 function getSlackUser(user) {
-  var userobj = rtm.dataStore.getUserById(user);
+  const userobj = rtm.dataStore.getUserById(user);
   if (!userobj) {
-    return;
+    return null;
   }
   return userobj.name;
 }
 
 //-----------------------------------------------------------
 function claimServer(context) {
-  var data = readServerData(context.server);
+  const data = readServerData(context.server);
 
-  if (context.server.indexOf('dev-linode') > -1){
-      context.write('ERROR. ' + context.server + ' outdated. Use sandbox-**');
-      return;
+  if (context.server.indexOf('dev-linode') > -1) {
+    context.write(`ERROR. ${context.server} outdated. Use sandbox-**`);
+    return;
   }
 
-  var current_time = Date.now();
+  const currentTime = Date.now();
   if (data.valid_till_timestamp && context.slackuser !== data.owner) {
-    if(current_time < data.valid_till_timestamp) {
-      context.write('ERROR. ' + context.server + ' is owned by <@' + data.owner + '> till ' +
-             getDateFromTimestamp(data.valid_till_timestamp));
+    if (currentTime < data.valid_till_timestamp) {
+      context.write(`ERROR. ${context.server} is owned by <@${data.owner}> till ${
+        getDateFromTimestamp(data.valid_till_timestamp)}`);
       return;
     }
   }
 
-  var userchange = data.owner && data.owner != context.slackuser;
-  var last_owner = data.owner;
-  var claim_time_override;
+  const userchange = data.owner && data.owner !== context.slackuser;
+  const lastOwner = data.owner;
+  let claimTimeOverride;
   if (data.config.acquire_infinitely) {
-    claim_time_override = new Date('2020-02-02').valueOf();
+    claimTimeOverride = new Date('2020-02-02').valueOf();
   }
-  data.valid_till_timestamp = getClaimTimeRight(claim_time_override);
+  data.valid_till_timestamp = getClaimTimeRight(claimTimeOverride);
   data.owner = context.slackuser;
   data.ownerDM = context.slackuserDM;
 
   writeServerData(context.server, data);
 
-  var result = context.server + ' is yours <@' + data.owner + '> till ' +
-               getDateFromTimestamp(data.valid_till_timestamp);
+  let result = `${context.server} is yours <@${data.owner}> till ${
+    getDateFromTimestamp(data.valid_till_timestamp)}`;
   if (userchange) {
-    result += "\n<@" + last_owner + "> lost ownership\n";
+    result += `\n<@${lastOwner}> lost ownership\n`;
   }
   context.write(result);
 
   if (!data.server_created_timestamp) {
     data.server_created_timestamp = Date.now();
     if (data.config.webhook_create_server) {
-      webhook_create_server(context, data.config.webhook_create_server, function(err) {
+      webhookCreateServer(context, data.config.webhook_create_server, (err) => {
         if (!err) {
           // update server creation time
           writeServerData(context.server, data);
@@ -142,23 +145,23 @@ function claimServer(context) {
 
 //-----------------------------------------------------------
 function unClaimServer(context) {
-  var data = readServerData(context.server);
-  var current_time = Date.now();
-  var expired = data.valid_till_timestamp < current_time;
-  var last_owner = data.owner;
+  const data = readServerData(context.server);
+  const currentTime = Date.now();
+  const expired = data.valid_till_timestamp < currentTime;
+  const lastOwner = data.owner;
 
   if (!expired && context.slackuser !== data.owner) {
-    context.write('ERROR. ' + context.server + ' is owned by <@' + data.owner + '>');
+    context.write(`ERROR. ${context.server} is owned by <@${data.owner}>`);
     return;
   }
 
-  data.valid_till_timestamp = current_time;
+  data.valid_till_timestamp = currentTime;
   data.owner = undefined;
   writeServerData(context.server, data);
 
-  var result = context.server + ' is free';
-  if (last_owner) {
-    result += '\n<@' + last_owner + '> lost ownership';
+  let result = `${context.server} is free`;
+  if (lastOwner) {
+    result += `\n<@${lastOwner}> lost ownership`;
   }
   context.write(result);
 }
@@ -169,24 +172,24 @@ function compareServerName(objA, objB) {
     return -1;
   } else if (objA.server > objB.server) {
     return +1;
-  } else {
-    return 0;
   }
+  return 0;
+
 }
 
 //-----------------------------------------------------------
 function listServers(context) {
-  var datas = readServersData();
-  var result = [];
-  var current_time = Date.now();
+  const datas = readServersData();
+  const result = [];
+  const currentTime = Date.now();
 
-  for (var idx in datas) {
-    var data = datas[idx];
-    if (!data.valid_till_timestamp || data.valid_till_timestamp <= current_time) {
-      result.push(data.server + ' is free');
+  for (const idx in datas) {
+    const data = datas[idx];
+    if (!data.valid_till_timestamp || data.valid_till_timestamp <= currentTime) {
+      result.push(`${data.server} is free`);
     } else {
-      result.push(data.server + ' is owned by ' + data.owner + ' till ' +
-                  getDateFromTimestamp(data.valid_till_timestamp));
+      result.push(`${data.server} is owned by ${data.owner} till ${
+        getDateFromTimestamp(data.valid_till_timestamp)}`);
     }
   }
 
@@ -196,9 +199,9 @@ function listServers(context) {
 //-----------------------------------------------------------
 function printHelp(context) {
   context.write(
-         BOT_NAME + " list\n" +
-         BOT_NAME + " get <server>\n" +
-         BOT_NAME + " free <server>\n"
+    `${BOT_NAME} list\n${
+      BOT_NAME} get <server>\n${
+      BOT_NAME} free <server>\n`,
   );
 }
 
@@ -210,29 +213,29 @@ function checkServersLoop() {
       return;
     }
 
-    var channel = rtm.dataStore.getChannelByName(BOT_CHANNEL);
+    const channel = rtm.dataStore.getChannelByName(BOT_CHANNEL);
     if (!channel) {
       console.log('Cant find channel', BOT_CHANNEL, '(absent or private)');
       return;
     }
 
-    var result = [];
-    var current_time = Date.now();
-    var datas = readServersData();
+    const result = [];
+    const currentTime = Date.now();
+    const datas = readServersData();
 
-    for (var idx in datas) {
-      var data = datas[idx];
+    for (const idx in datas) {
+      const data = datas[idx];
       if (!data.valid_till_timestamp) {
         continue;
       }
-      if (data.valid_till_timestamp < current_time) {
+      if (data.valid_till_timestamp < currentTime) {
         freeServerByBot(data.server, data, channel.id);
       }
-      if (data.valid_till_timestamp + DESTROY_TIME < current_time) {
+      if (data.valid_till_timestamp + DESTROY_TIME < currentTime) {
         destroyServerByBot(data.server, data, channel.id);
       }
     }
-  } catch(e) {
+  } catch (e) {
     console.error('loop', e);
   }
 }
@@ -241,15 +244,15 @@ setInterval(checkServersLoop, CHECK_SERVERS_STATUS_INTERVAL);
 //-----------------------------------------------------------
 function freeServerByBot(server, data, channelId) {
   if (data.owner) {
-    var lastowner = data.owner;
-    var lastownerDM = data.ownerDM;
+    const lastowner = data.owner;
+    const lastownerDM = data.ownerDM;
     data.owner = undefined;
     data.ownerDM = undefined;
     writeServerData(server, data);
 
-    rtm.sendMessage(server + " released by bot\n<@" + lastowner + "> lost ownership", channelId);
+    rtm.sendMessage(`${server} released by bot\n<@${lastowner}> lost ownership`, channelId);
     if (lastownerDM) {
-      rtm.sendMessage(server + " released by bot\n<@" + lastowner + "> lost ownership", lastownerDM);
+      rtm.sendMessage(`${server} released by bot\n<@${lastowner}> lost ownership`, lastownerDM);
     }
   }
 }
@@ -261,64 +264,64 @@ function destroyServerByBot(server, data, channelId) {
     writeServerData(server, data);
 
     if (data.config.webhook_destroy_server) {
-      var context = {
-        server: server,
-        write: function (msg) {
+      const context = {
+        server,
+        write(msg) {
           rtm.sendMessage(msg, channelId);
-        }
+        },
       };
-      webhook_destroy_server(context, data.config.webhook_destroy_server);
+      webhookDestroyServer(context, data.config.webhook_destroy_server);
     }
   }
 }
 
 //-----------------------------------------------------------
-function webhook_create_server(context, url, callback) {
-  context.write('Jenkins: ' + context.server + ' being created...');
-  request(url, function(err, data) {
+function webhookCreateServer(context, url, callback) {
+  context.write(`Jenkins: ${context.server} being created...`);
+  request(url, (err, data) => {
     if (err) {
-      context.write('Jenkins: ' + context.server + ' CREATING ERROR!');
+      context.write(`Jenkins: ${context.server} CREATING ERROR!`);
       console.log('webhook_create_server ERR', err);
     } else {
-      context.write('Jenkins: ' + context.server + ' created!');
+      context.write(`Jenkins: ${context.server} created!`);
     }
     if (callback) { callback(err); }
   });
 }
 
-function webhook_destroy_server(context, url) {
-  context.write('Jenkins: ' + context.server + ' being destroyed...');
-  request(url, function(err, data) {
+function webhookDestroyServer(context, url) {
+  context.write(`Jenkins: ${context.server} being destroyed...`);
+  request(url, (err, data) => {
     if (err) {
-      context.write('Jenkins: ' + context.server + ' DESTROYING ERROR!');
+      context.write(`Jenkins: ${context.server} DESTROYING ERROR!`);
       console.log('webhook_destroy_server ERR', context.server, url, err);
     } else {
-      context.write('Jenkins: ' + context.server + ' demolished!');
+      context.write(`Jenkins: ${context.server} demolished!`);
     }
   });
 }
 
 //-----------------------------------------------------------
 function readServerData(server) {
-  var data = {};
+  const data = {};
   try {
-    var serverFileName = [SERVERSLIST_DIR, server].join('/');
+    const serverFileName = [SERVERSLIST_DIR, server].join('/');
     data.config = JSON.parse(fs.readFileSync(serverFileName));
-  } catch(e) {
+  } catch (e) {
     if (e.code === 'ENOENT') {
-      throw 'Unknown server: ' + server;
+      throw new Error(`Unknown server: ${server}`);
     }
     console.error(e);
-    throw 'Internal error while reading: ' + server;
+    throw new Error(`Internal error while reading: ${server}`);
   }
 
   try {
-    var infoFileName = [INFO_DIR, server].join('/');
-    var info = JSON.parse(fs.readFileSync(infoFileName));
-    for (var key in info){
+    const infoFileName = [INFO_DIR, server].join('/');
+    const info = JSON.parse(fs.readFileSync(infoFileName));
+    for (const key in info) {
       data[key] = info[key];
     }
-  } catch(e) {
+  } catch (e) {
     if (e.code !== 'ENOENT') {
       console.error('error reading info:', server, e);
     }
@@ -329,12 +332,12 @@ function readServerData(server) {
 
 //-----------------------------------------------------------
 function readServersData() {
-  var serversList = fs.readdirSync(SERVERSLIST_DIR);
-  var result = [];
+  const serversList = fs.readdirSync(SERVERSLIST_DIR);
+  const result = [];
 
-  for (var idx in serversList) {
-    var server = serversList[idx];
-    var data = readServerData(server);
+  for (const idx in serversList) {
+    const server = serversList[idx];
+    const data = readServerData(server);
     result.push(data);
   }
 
@@ -344,45 +347,45 @@ function readServersData() {
 
 //-----------------------------------------------------------
 function writeServerData(server, data) {
-  var serverFileName = [INFO_DIR, server].join('/');
-  var dataCopy = JSON.parse(JSON.stringify(data));
+  const serverFileName = [INFO_DIR, server].join('/');
+  const dataCopy = JSON.parse(JSON.stringify(data));
   delete dataCopy.config;
   fs.writeFileSync(serverFileName, JSON.stringify(dataCopy));
 }
 
 //-----------------------------------------------------------
 function parseMessage(message) {
-  if (!message) return;
+  if (!message) return null;
 
   if (message[0] === '<' && message[1] === '@') {
-    var username_end = message.indexOf('>');
-    var user = message.slice(2, username_end);
-    var slackuser = getSlackUser(user);
+    const usernameEnd = message.indexOf('>');
+    const user = message.slice(2, usernameEnd);
+    const slackuser = getSlackUser(user);
     if (!slackuser || slackuser.indexOf(BOT_NAME) !== 0) {
-      return;
+      return null;
     }
   }
   else if (message.indexOf(BOT_NAME) !== 0) {
-    return;
+    return null;
   }
 
-  var parts = message.split(' ');
+  const parts = message.split(' ');
 
   return {
     cmd: parts[1],
-    params: parts.slice(2)
+    params: parts.slice(2),
   };
 }
 
 //-----------------------------------------------------------
 function getClaimTimeRight(claimTimeOverride) {
-  if (!isFinite(claimTimeOverride)){
+  if (!Number.isFinite(claimTimeOverride)) {
     claimTimeOverride = undefined;
   }
-  var claimTime = new Date(Date.now() + (claimTimeOverride || CLIAM_TIME));
-  var day_of_week = claimTime.getDay();
+  const claimTime = new Date(Date.now() + (claimTimeOverride || CLIAM_TIME));
+  const dayOfWeek = claimTime.getDay();
   // weekends are not counted
-  if (day_of_week === 0 || day_of_week === 6) {
+  if (dayOfWeek === 0 || dayOfWeek === 6) {
     claimTime.setHours(claimTime.getHours() + 48);
   }
   return claimTime.valueOf();
@@ -390,9 +393,6 @@ function getClaimTimeRight(claimTimeOverride) {
 
 //-----------------------------------------------------------
 function getDateFromTimestamp(timestamp) {
-  return new Date(timestamp).toJSON().slice(0,19).replace('T',' ') + ' (GMT)';
+  return `${new Date(timestamp).toJSON().slice(0, 19).replace('T', ' ')} (GMT)`;
 }
-
-
-
 
