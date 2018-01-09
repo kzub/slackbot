@@ -90,15 +90,21 @@ func printDays(days map[string]int64, additionalInfo map[string]string) {
 		duration, _ := getDayHours(days[day])
 		printTime := getHourFormat(duration)
 		weekday := getTime(day).Weekday().String()[:3]
-		fmt.Printf("%s  %d  %s  %s  %s\r\n", day, getWeek(day), weekday, printTime, additionalInfo[day])
+		fmt.Printf("%s  %.2d  %s  %s  %s\r\n", day, getWeek(day), weekday, printTime, additionalInfo[day])
 	}
 }
 
 func printWeeks(days map[string]int64) {
+	var sortedDays []string
 	weeks := make(map[int]float32)
 	badHoursDetected := make(map[int]int)
 
-	for day := range days {
+	for dayi := range days {
+		sortedDays = append(sortedDays, dayi)
+	}
+	sortedDays = addAbsentDates(sortedDays)
+
+	for _, day := range sortedDays {
 		week := getWeek(day)
 		dayHours, err := getDayHours(days[day])
 		if err {
@@ -113,8 +119,7 @@ func printWeeks(days map[string]int64) {
 	for week := range weeks {
 		sortedWeeks = append(sortedWeeks, week)
 	}
-	sortedWeeks = addAbsentWeeks(sortedWeeks)
-	sortedWeeks = sortedWeeks[2:]
+	sort.Ints(sortedWeeks)
 
 	for _, week := range sortedWeeks {
 		duration := weeks[week]
@@ -195,8 +200,20 @@ func addAbsentWeeks(sortedWeeks []int) []int {
 	max := sortedWeeks[len(sortedWeeks)-1]
 
 	var newSortedWeeks []int
+	// fmt.Println("max", max, "min", min)
 	for ; min <= max; min++ {
-		newSortedWeeks = append(newSortedWeeks, min)
+		if contains(sortedWeeks, min) || (max-min) < 20 {
+			newSortedWeeks = append(newSortedWeeks, min)
+		}
 	}
 	return newSortedWeeks
+}
+
+func contains(s []int, e int) bool {
+	for _, a := range s {
+		if a == e {
+			return true
+		}
+	}
+	return false
 }

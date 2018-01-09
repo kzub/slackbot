@@ -179,7 +179,7 @@ function processAdminMessage(message, msgChannelId) {
 }
 
 function getSlackUser(user) {
-  var userobj = rtm.dataStore.getUserById(user);
+  const userobj = rtm.dataStore.getUserById(user);
   if (!userobj) {
     return;
   }
@@ -187,7 +187,7 @@ function getSlackUser(user) {
 }
 
 function getSlackChannel(channelId) {
-  var chanobj = rtm.dataStore.getChannelById(channelId);
+  const chanobj = rtm.dataStore.getChannelById(channelId);
   if (!chanobj) {
     return;
   }
@@ -217,7 +217,7 @@ function checkUserAtSkud(username, callback){
 function keepteamAuth (callback) {
   console.log('keepteam: make auth...');
   delete keepteamHeaders.Cookie;
-  var options = {
+  const options = {
     url: `https://${KT_HOST}/api/authentication/logon`,
     method: 'POST',
     body: process.env.KT_TOKEN,
@@ -238,7 +238,7 @@ function keepteamAuth (callback) {
 }
 
 function keepteamSearchName(name, callback) {
-  var options = {
+  let options = {
     url: `https://${KT_HOST}/api/employees/suggest`,
     method: 'POST',
     headers: keepteamHeaders,
@@ -299,7 +299,7 @@ function keepteamTimeOffs(user, callback){
     return;
   }
 
-  var options = {
+  const options = {
     url: `https://${KT_HOST}/api/TimeOffs/List`,
     method: 'POST',
     headers: keepteamHeaders,
@@ -313,7 +313,7 @@ function keepteamTimeOffs(user, callback){
       return;
     }
 
-    var data;
+    let data;
     try {
       data = JSON.parse(body).Result;
     } catch (e) {
