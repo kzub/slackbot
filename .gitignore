@@ -6,4 +6,5 @@ guardian.conf
 skud/skud
 skud/check.sh
 office_time.conf
-
+.idea
+package-lock.json

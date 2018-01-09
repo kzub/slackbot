@@ -1,6 +1,6 @@
 {
   "name": "devsandboxbot",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Master of devsandbox",
   "main": "./index",
   "scripts": {
@@ -10,12 +10,20 @@
   "license": "MIT",
   "repository": "",
   "dependencies": {
-    "request": "v2.64.0",
-    "@slack/client": "3.6.0",
-    "async": "2.6.0"
+    "async": "2.6.0",
+    "request": "v2.83.0",
+    "@slack/client": "3.15.0"
+  },
+  "devDependencies": {
+    "eslint": "4.13.1",
+    "eslint-config-airbnb-base": "12.1.0",
+    "eslint-loader": "1.9.0",
+    "eslint-plugin-import": "2.8.0",
+    "eslint-plugin-promise": "3.6.0",
+    "eslint-plugin-standard": "3.0.1"
   },
   "engines": {
-    "node": ">= 0.10.x",
-    "npm": ">= 1.1.x"
+    "node": ">= 4.x",
+    "npm": ">= 3.x"
   }
 }

@@ -20,7 +20,7 @@ if (!KT_HOST) {
   return;
 }
 
-var keepteamHeaders = {
+const keepteamHeaders = {
   'Content-Type': 'application/json; charset=utf-8',
   'Accept': 'application/json, text/plain, */*',
   'Referer': `https://${KT_HOST}/`,
@@ -28,52 +28,48 @@ var keepteamHeaders = {
 };
 
 //---------------------------------- SLACK BOT -----------------------------
-var rtm = new RtmClient(token, {
+const rtm = new RtmClient(token, {
   logLevel: 'error', // check this out for more on logger: https://github.com/winstonjs/winston
-  dataStore: new MemoryDataStore() // pass a new MemoryDataStore instance to cache information
+  dataStore: new MemoryDataStore(), // pass a new MemoryDataStore instance to cache information
 });
 
 rtm.start();
-rtm.on(CLIENT_EVENTS.RTM.AUTHENTICATED, function handleRTMAuthenticated() {
+rtm.on(CLIENT_EVENTS.RTM.AUTHENTICATED, () => {
   console.log('RTM client authenticated!', new Date());
 });
 
-var config = JSON.parse(fs.readFileSync(configName));
+const channelsMap = {};
+const config = JSON.parse(fs.readFileSync(configName));
 
-rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
+rtm.on(RTM_EVENTS.MESSAGE, (message) => {
   try {
     if (!message.user || !message.text) {
       return;
     }
 
-    var slackuser = getSlackUser(message.user);
+    const slackuser = getSlackUser(message.user);
     if (!slackuser) {
-      console.log("error getting slackuser", message);
+      console.log('error getting slackuser', message);
       return;
     }
-    var channel = getSlackChannel(message.channel);
+    const channel = getSlackChannel(message.channel);
     if (channel) {
       // not direct message
       return;
     }
 
-    if(config.admins[slackuser] && processAdminMessage(message.text, message.channel)){
+    if (config.admins[slackuser] && processAdminMessage(message.text, message.channel)) {
       return;
     }
-    if(config.users[slackuser]){
-      console.log(new Date().toJSON() + ' ' + slackuser + ' check user:' + message.text);
-      try{
-        processUserMessage(message.text, message.channel);
-      }
-      catch(e){
-        console.log('Exception:', e);
-      }
+
+    if (config.users[slackuser]) {
+      console.log(`${new Date().toJSON()} ${slackuser} check user: ${message.text}`);
+      processUserMessage(message.text, message.channel);
       return;
     }
 
     rtm.sendMessage('¯\\_(ツ)_/¯', message.channel);
-
-  } catch(err) {
+  } catch (err) {
     console.error(err, err.stack);
   }
 });
@@ -86,7 +82,7 @@ function processUserMessage(message, msgChannelId) {
     },
     (cb) => {
       checkUserAtKeepteam(message, (err, res) => {
-        cb(undefined, res || {})
+        cb(undefined, res || {});
       });
     }
   ], (err, result) =>{
@@ -105,18 +101,18 @@ function processUserMessage(message, msgChannelId) {
 
     let lines = skud.split('\r\n');
     let lastDate;
-    for(let idx in lines){
+    for (const idx in lines) {
       let line = lines[idx];
       let date = line.slice(0, 10);
-      if(line.indexOf('----------') == 0){
+      if(line.indexOf('----------') === 0){
         let was = response.push(line);
-        insertKTFutureDates(kt, lastDate, response)
+        insertKTFutureDates(kt, lastDate, response);
         if(was !== response.length){
           response.push(line);
         }
         continue;
       }
-      lastDate = date
+      lastDate = date;
       if(kt[date]){
         line += kt[date];
       }
@@ -145,21 +141,21 @@ function processAdminMessage(message, msgChannelId) {
   const cmd = parts[0];
   const name = parts[1];
 
-  if (cmd == 'add'){
+  if (cmd === 'add') {
     let user = rtm.dataStore.getUserByName(name);
     if (!user) {
-      rtm.sendMessage("failed. unknown user " + name, msgChannelId);
+      rtm.sendMessage(`failed. unknown user ${name}`, msgChannelId);
       return true;
     }
 
     config.users[name] = true;
     fs.writeFileSync(configName, JSON.stringify(config));
-    rtm.sendMessage("ok", msgChannelId);
+    rtm.sendMessage('ok', msgChannelId);
     return true;
   }
 
-  if (cmd == 'list'){
-    let msg = [];
+  if (cmd === 'list') {
+    const msg = [];
     for (let user in config.users) {
       msg.push(user);
     }
@@ -167,18 +163,19 @@ function processAdminMessage(message, msgChannelId) {
     return true;
   }
 
-  if (cmd == 'del'){
-    let user = rtm.dataStore.getUserByName(name);
+  if (cmd === 'del') {
+    const user = rtm.dataStore.getUserByName(name);
     if (!user) {
-      rtm.sendMessage("failed. unknown user " + name, msgChannelId);
+      rtm.sendMessage(`failed. unknown user ${name}`, msgChannelId);
       return true;
     }
 
     delete config.users[name];
     fs.writeFileSync(configName, JSON.stringify(config));
-    rtm.sendMessage("ok", msgChannelId);
+    rtm.sendMessage('ok', msgChannelId);
     return true;
   }
+  return false;
 }
 
 function getSlackUser(user) {
@@ -201,7 +198,7 @@ function getSlackChannel(channelId) {
 //---------------------------------- SKUD PART -------------------------
 function checkUserAtSkud(username, callback){
   const check = spawn('skud', [username]);
-  var output = '';
+  let output = '';
 
   check.stdout.on('data', (data) => {
     output += data;
@@ -333,7 +330,7 @@ function formatDate(date){
 }
 
 function formatTimeOffs(data){
-  var detailed = {};
+  const detailed = {};
   for (let idx in data) {
     extendTimeOffs(data[idx], detailed);
   }
@@ -341,13 +338,11 @@ function formatTimeOffs(data){
 }
 
 function extendTimeOffs(elm, target) {
-  date1 = new Date(elm.StartDate);
-  date2 = new Date(elm.EndDate);
+  let date1 = new Date(elm.StartDate);
+  let date2 = new Date(elm.EndDate);
 
   for (; date1 <= date2; date1 = new Date(date1.valueOf() + 86400000)){
     target[formatDate(date1)] = elm.Type.Name;
   }
   return target;
 }
-
-
