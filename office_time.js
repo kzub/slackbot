@@ -39,21 +39,20 @@ rtm.on(CLIENT_EVENTS.RTM.AUTHENTICATED, () => {
 });
 
 const channelsMap = {};
-const config = JSON.parse(fs.readFileSync(configName));
+let config = JSON.parse(fs.readFileSync(configName));
 
 rtm.on(RTM_EVENTS.MESSAGE, (message) => {
   try {
     if (!message.user || !message.text) {
       return;
     }
-
     const slackuser = getSlackUser(message.user);
     if (!slackuser) {
       console.log('error getting slackuser', message);
       return;
     }
-    const channel = getSlackChannel(message.channel);
-    if (channel) {
+    const direct = isSlackDirectChannel(message.channel);
+    if (!direct) {
       // not direct message
       return;
     }
@@ -194,6 +193,16 @@ function getSlackChannel(channelId) {
   return chanobj.name;
 }
 
+function isSlackDirectChannel(channelId) {
+  return channelId && channelId[0] === 'D';
+}
+
+function sendSlackChannelMsg(msg) {
+  if (!msg) {
+    return;
+  }
+  rtm.sendMessage(msg, config.slackChannelId);
+}
 
 //---------------------------------- SKUD PART -------------------------
 function checkUserAtSkud(username, callback){
@@ -245,7 +254,7 @@ function keepteamSearchName(name, callback) {
     body: `{"Filter":{"Name":"${name}"},"Page":{"Size":30,"Number":1},"IsActive":true}`
   };
 
-  request(options, function (error, response, body) {
+  ktrequest(options, function (error, response, body) {
     if (response && response.statusCode != 200) {
       console.log('keepteam::SearchName::bad_status', error, response.statusCode);
       callback('wrong_status_code', response.statusCode);
@@ -268,15 +277,8 @@ function keepteamSearchName(name, callback) {
   });
 }
 
-function checkUserAtKeepteam(name, callback, retry){
+function checkUserAtKeepteam(name, callback){
   keepteamSearchName(name, (err, user) => {
-    if(err == 'wrong_status_code' && user == 401 && !retry){
-      keepteamAuth(() => {
-        checkUserAtKeepteam(name, callback, true);
-      });
-      return;
-    }
-
     if(err){
       callback(err);
       return;
@@ -306,7 +308,7 @@ function keepteamTimeOffs(user, callback){
     body: `{"Filter":{"Employees":["${user.Id}"],"IsApproved":[],"Date":{},"Types":[],"Departments":[]},"OrderBy":{"ColumnName":"Date","Descending":true},"Page":{"Number":1,"Size":50}}`
   };
 
-  request(options, (error, response, body) => {
+  ktrequest(options, (error, response, body) => {
     if (response && response.statusCode != 200) {
       console.log('keepteam::TimeOffs::error', error, response.statusCode);
       callback(error);
@@ -324,6 +326,85 @@ function keepteamTimeOffs(user, callback){
     callback(undefined, data);
   });
 }
+
+function ktrequest(opts, callback){
+  request(opts, (error, response, body) => {
+    if (response.statusCode != 200) {
+      keepteamAuth(() => {
+        request(opts, callback);
+      });
+      return;
+    }
+    callback(error, response, body);
+  });
+}
+
+function keepteamGetFeed(callback){
+  const today = new Date().toJSON().slice(0, 10);
+  const yesterday = new Date(Date.now() - 86400000).toJSON().slice(0, 10);
+  const dayStart = yesterday + 'T00:00:00.000Z';
+  const dayEnd = today + 'T59:99:99.999Z';
+
+  const options = {
+    url: `https://${KT_HOST}/api/feed/list`,
+    method: 'POST',
+    headers: keepteamHeaders,
+    body: `{"Filter":{"Employees":[],"Date":{Start: "${dayStart}", End: "${dayEnd}"},"Departments":[],"EventTypeCategories":[]},"OrderBy":{"ColumnName":null,"Descending":true},"TimezoneOffset":-180,"Page":{"Number":1,"Size":50}}`
+  };
+
+  ktrequest(options, (error, response, body) => {
+    if (response && response.statusCode != 200) {
+      console.log('keepteam::keepteamGetFeed::error', error, response.statusCode);
+      callback(error);
+      return;
+    }
+
+    let data;
+    try {
+      data = JSON.parse(body).Result;
+    } catch (e) {
+      console.log('keepteam::keepteamGetFeed::error 2', e, body);
+      callback(e);
+      return;
+    }
+    callback(undefined, data);
+  });
+}
+
+function keepTeamGetFeedNew(callback) {
+  keepteamGetFeed((err, data) => {
+    let res = []
+    config = JSON.parse(fs.readFileSync(configName));
+    let last = new Date(config.lastTimeFeed);
+
+    for (let e of data) {
+      let date = new Date(e.Event.Date);
+      if (date <= last || !e.Event.TimeOff) {
+        console.log('skip', date);
+        continue;
+      }
+      let employee = [e.Event.Employee.LastName, e.Event.Employee.FirstName, e.Event.Employee.MiddleName].join(' ');
+      let reason = e.Event.Type.Name;
+      if (e.Comment) {
+        res.push(`${e.Comment}, дней: ${e.Event.TimeOff.Days} | ${employee}`);
+      }
+    }
+
+    let maxFeedDate = data.reduce((r, e)=> { return new Date(r) < new Date(e.Event.Date) ? e.Event.Date : r }, 0);
+    config.lastTimeFeed = maxFeedDate;
+    fs.writeFileSync(configName, JSON.stringify(config, null, 2));
+    if (callback) {
+      callback(res.join('\n'));
+    }
+  });
+}
+
+//------------------- Report new events ------------------
+setInterval(() => {
+  keepTeamGetFeedNew(r => {
+    sendSlackChannelMsg(r);
+  });
+}, config.feedCheckInterval);
 
 function formatDate(date){
   return date.toJSON().slice(0,10);
