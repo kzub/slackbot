@@ -128,12 +128,46 @@ func printWeeks(days map[string]int64) {
 	}
 }
 
+func lateUsers(conn *sql.DB) (res []string) {
+	rows, err := conn.Query(`SELECT EV_DATETIME, USER_NAME FROM V_EVLOG WHERE EV_DATETIME BETWEEN CURRENT_DATE AND
+	                         CURRENT_TIME AND DEV_GID IN (1001, 1005, 1007) AND MSG_ID = 30 AND DEPT_ID <> 3 ORDER BY EV_DATETIME ASC`)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer rows.Close()
+
+	var date string
+	var userName string
+	users := make(map[string][]string)
+	for rows.Next() {
+		rows.Scan(&date, &userName)
+		users[userName] = append(users[userName], date)
+	}
+
+	today := time.Now().String()[:10]
+	timeX, _ := time.Parse(time.RFC3339, today+"T11:30:00Z")
+
+	for u, k := range users {
+		firstEnter := k[0]
+		t, _ := time.Parse(time.RFC3339, firstEnter)
+		if t.After(timeX) {
+			fmt.Println(firstEnter + "|" + u)
+		}
+	}
+	return
+}
+
 func main() {
 	conn, _ := sql.Open("firebirdsql", os.Getenv("DBPATH"))
 	defer conn.Close()
 
 	if len(os.Args) > 1 {
 		name := strings.Join(os.Args[1:], " ")
+		if name == "late" {
+			lateUsers(conn)
+			return
+		}
 		users := scanUsers(conn, name)
 		if len(users) == 1 {
 			viewUser(conn, users[0])

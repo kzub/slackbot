@@ -222,6 +222,62 @@ function checkUserAtSkud(username, callback){
   });
 }
 
+
+function checkLateUsers(callback) {
+  const check = spawn('skud', ['late']);
+  let output = '';
+
+  check.stdout.on('data', (data) => {
+    output += data;
+  });
+
+  check.stderr.on('data', (data) => {
+    output += data;
+  });
+
+  check.on('close', (code) => {
+    let res = checkLateUsersData(output);
+    if (res && callback) {
+      callback(res);
+    }
+  });
+}
+
+function checkLateUsersData(data) {
+  if (!data) {
+    return;
+  }
+  config = JSON.parse(fs.readFileSync(configName));
+  let res = [];
+  let last = new Date(config.lastTimeLate || 0);
+  let maxLateDate = last;
+  let records = data.split('\n');
+
+  for (let r of records) {
+    let [date, name] = r.split('|');
+    if (!date) {
+      continue;
+    }
+    date = new Date(date)
+    if (date <= last) {
+      continue;
+    }
+    if (date > maxLateDate) {
+      maxLateDate = date;
+    }
+    res.push(`Опоздание. ${date.toJSON().slice(11, 19)} приход: ${name}`);
+  }
+
+  if (maxLateDate == last) {
+    return;
+  }
+
+  config.lastTimeLate = maxLateDate;
+  fs.writeFileSync(configName, JSON.stringify(config, null, 2));
+
+  return res.length && res.join('\n');
+}
+
 //---------------------------------- KEEPTEAM PART -----------------------------
 function keepteamAuth (callback) {
   console.log('keepteam: make auth...');
@@ -376,12 +432,16 @@ function keepTeamGetFeedNew(callback) {
     let res = []
     config = JSON.parse(fs.readFileSync(configName));
     let last = new Date(config.lastTimeFeed);
+    let maxFeedDate = last;
 
     for (let e of data) {
       let date = new Date(e.Event.Date);
       if (date <= last || !e.Event.TimeOff) {
         // console.log('skip', date);
         continue;
+      }
+      if (date > maxFeedDate) {
+        maxFeedDate = date;
       }
       let employee = [e.Event.Employee.LastName, e.Event.Employee.FirstName, e.Event.Employee.MiddleName].join(' ');
       let reason = e.Event.Type.Name;
@@ -390,10 +450,13 @@ function keepTeamGetFeedNew(callback) {
       }
     }
 
-    let maxFeedDate = data.reduce((r, e)=> { return new Date(r) < new Date(e.Event.Date) ? e.Event.Date : r }, 0);
+    if (maxFeedDate == last) {
+      return;
+    }
+
     config.lastTimeFeed = maxFeedDate;
     fs.writeFileSync(configName, JSON.stringify(config, null, 2));
-    if (callback) {
+    if (callback && res.length) {
       callback(res.join('\n'));
     }
   });
@@ -404,6 +467,9 @@ setInterval(() => {
   keepTeamGetFeedNew(r => {
     sendSlackChannelMsg(r);
   });
+  checkLateUsers(r => {
+    sendSlackChannelMsg(r);
+  })
 }, config.feedCheckInterval);
 
 function formatDate(date){
