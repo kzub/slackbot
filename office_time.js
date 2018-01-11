@@ -380,7 +380,7 @@ function keepTeamGetFeedNew(callback) {
     for (let e of data) {
       let date = new Date(e.Event.Date);
       if (date <= last || !e.Event.TimeOff) {
-        console.log('skip', date);
+        // console.log('skip', date);
         continue;
       }
       let employee = [e.Event.Employee.LastName, e.Event.Employee.FirstName, e.Event.Employee.MiddleName].join(' ');
