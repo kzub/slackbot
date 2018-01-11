@@ -12,7 +12,7 @@ const RTM_EVENTS = slack.RTM_EVENTS;
 const MemoryDataStore = slack.MemoryDataStore;
 const token = process.env.SLACK_API_TOKEN;
 const token2 = process.env.SLACK_API_TOKEN_LEGACY;
-const configName = 'office_time.conf';
+const configName = './office_time.conf';
 const KT_HOST = process.env.KT_HOST;
 
 if (!KT_HOST) {
