@@ -437,7 +437,11 @@ function keepTeamGetFeedNew(callback) {
     for (let e of data) {
       let date = new Date(e.Event.Date);
       if (date <= last || !e.Event.TimeOff) {
-        // console.log('skip', date);
+        // console.log('skip date', date);
+        continue;
+      }
+      if (e.Event.Type.InternalName !== 'TimeOffAdded') {
+        // console.log('skip event', e.Event.Type.InternalName);
         continue;
       }
       if (date > maxFeedDate) {
@@ -446,7 +450,7 @@ function keepTeamGetFeedNew(callback) {
       let employee = [e.Event.Employee.LastName, e.Event.Employee.FirstName, e.Event.Employee.MiddleName].join(' ');
       let reason = e.Event.Type.Name;
       if (e.Comment) {
-        res.push(`${e.Comment}, дней: ${e.Event.TimeOff.Days} | ${employee}`);
+        res.push(`Заявка на "${e.Comment}", дней: ${e.Event.TimeOff.Days}, ${employee}`);
       }
     }
 
