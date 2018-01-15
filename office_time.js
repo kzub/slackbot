@@ -67,7 +67,7 @@ rtm.on(RTM_EVENTS.MESSAGE, (message) => {
       return;
     }
 
-    rtm.sendMessage('¯\\_(ツ)_/¯', message.channel);
+    rtm.sendMessage('Нет доступа ¯\\_(ツ)_/¯', message.channel);
   } catch (err) {
     console.error(err, err.stack);
   }
@@ -265,13 +265,14 @@ function checkLateUsersData(data) {
     if (date > maxLateDate) {
       maxLateDate = date;
     }
-    res.push(`Опоздание. ${date.toJSON().slice(11, 19)} приход: ${name}`);
+    res.push(`Приход: ${date.toJSON().slice(11, 19)} ${name}`);
   }
 
   if (maxLateDate == last) {
     return;
   }
 
+  console.log(new Date().toJSON(), 'Приход:\n', res.length && res.join('\n'));
   config.lastTimeLate = maxLateDate;
   fs.writeFileSync(configName, JSON.stringify(config, null, 2));
 
