@@ -129,12 +129,12 @@ func printWeeks(days map[string]int64) {
 }
 
 func lateUsers(conn *sql.DB) (res []string) {
-	yesterday := time.Now().Add(time.Hour * -24).String()[:19]
+	dayBegin := time.Now().String()[:10] + " 00:00:00"
 	now := time.Now().String()[:19]
 	query := fmt.Sprintf(
 		`SELECT EV_DATETIME, USER_NAME FROM V_EVLOG WHERE EV_DATETIME BETWEEN '%s' AND '%s'
 			AND DEV_GID IN (1001, 1005, 1007, 1009) AND MSG_ID = 30 AND DEPT_ID NOT IN (3, 9) ORDER BY EV_DATETIME ASC`,
-		yesterday, now)
+		dayBegin, now)
 
 	rows, err := conn.Query(query)
 	if err != nil {
