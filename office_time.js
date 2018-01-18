@@ -14,6 +14,7 @@ const token = process.env.SLACK_API_TOKEN;
 const token2 = process.env.SLACK_API_TOKEN_LEGACY;
 const configName = process.env.OFFICEBOT_CONFIG;
 const KT_HOST = process.env.KT_HOST;
+const skudBinary = process.env.SKUDAPP;
 
 if (!KT_HOST) {
   console.log('No KT_HOST');
@@ -206,7 +207,7 @@ function sendSlackChannelMsg(msg) {
 
 //---------------------------------- SKUD PART -------------------------
 function checkUserAtSkud(username, callback){
-  const check = spawn('skud', [username]);
+  const check = spawn(skudBinary, [username]);
   let output = '';
 
   check.stdout.on('data', (data) => {
