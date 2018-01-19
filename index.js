@@ -199,9 +199,9 @@ function listServers(context) {
 //-----------------------------------------------------------
 function printHelp(context) {
   context.write(
-    `${BOT_NAME} list\n${
-      BOT_NAME} get <server>\n${
-      BOT_NAME} free <server>\n`,
+    `${BOT_NAME} list
+    ${BOT_NAME} get <server>
+    ${BOT_NAME} free <server>\n`,
   );
 }
 
