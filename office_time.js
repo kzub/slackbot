@@ -225,7 +225,7 @@ function checkUserAtSkud(username, callback){
 
 
 function checkLateUsers(callback) {
-  const check = spawn('skud', ['late']);
+  const check = spawn(skudBinary, ['late']);
   let output = '';
 
   check.stdout.on('data', (data) => {
