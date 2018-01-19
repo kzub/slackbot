@@ -75,7 +75,7 @@ rtm.on(RTM_EVENTS.MESSAGE, (message) => {
         listServers(context); break;
       case 'help':
         printHelp(context); break;
-      default: throw new Error('unknown command');
+      default: throw new Error('zina got unknown command:' + data.cmd);
     }
   } catch (err) {
     console.error(err, err.stack);
@@ -200,9 +200,8 @@ function listServers(context) {
 function printHelp(context) {
   context.write(
     `${BOT_NAME} list
-    ${BOT_NAME} get <server>
-    ${BOT_NAME} free <server>\n`,
-  );
+${BOT_NAME} get <server>
+${BOT_NAME} free <server>\n`);
 }
 
 //-----------------------------------------------------------
