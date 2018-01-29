@@ -80,7 +80,7 @@ rtm.on(RTM_EVENTS.MESSAGE, (message) => {
   } catch (err) {
     console.error(err, err.stack);
     const result = typeof (err) === 'string' ? err : 'Internal error';
-    context.write(`<@${slackuser}> ${result}`);
+    context.write(`${slackuser} ${result}`);
   }
 });
 
@@ -105,8 +105,7 @@ function claimServer(context) {
   const currentTime = Date.now();
   if (data.valid_till_timestamp && context.slackuser !== data.owner) {
     if (currentTime < data.valid_till_timestamp) {
-      context.write(`ERROR. ${context.server} is owned by <@${data.owner}> till ${
-        getDateFromTimestamp(data.valid_till_timestamp)}`);
+      context.write(`ERROR. ${context.server} is owned by ${data.owner} till ${getDateFromTimestamp(data.valid_till_timestamp)}`);
       return;
     }
   }
@@ -123,10 +122,9 @@ function claimServer(context) {
 
   writeServerData(context.server, data);
 
-  let result = `${context.server} is yours <@${data.owner}> till ${
-    getDateFromTimestamp(data.valid_till_timestamp)}`;
+  let result = `${context.server} is yours ${data.owner} till ${getDateFromTimestamp(data.valid_till_timestamp)}`;
   if (userchange) {
-    result += `\n<@${lastOwner}> lost ownership\n`;
+    result += `\n${lastOwner} lost ownership\n`;
   }
   context.write(result);
 
@@ -151,7 +149,7 @@ function unClaimServer(context) {
   const lastOwner = data.owner;
 
   if (!expired && context.slackuser !== data.owner) {
-    context.write(`ERROR. ${context.server} is owned by <@${data.owner}>`);
+    context.write(`ERROR. ${context.server} is owned by ${data.owner}`);
     return;
   }
 
@@ -161,7 +159,7 @@ function unClaimServer(context) {
 
   let result = `${context.server} is free`;
   if (lastOwner) {
-    result += `\n<@${lastOwner}> lost ownership`;
+    result += `\n${lastOwner} lost ownership`;
   }
   context.write(result);
 }
@@ -188,8 +186,7 @@ function listServers(context) {
     if (!data.valid_till_timestamp || data.valid_till_timestamp <= currentTime) {
       result.push(`${data.server} is free`);
     } else {
-      result.push(`${data.server} is owned by ${data.owner} till ${
-        getDateFromTimestamp(data.valid_till_timestamp)}`);
+      result.push(`${data.server} is owned by ${data.owner} till ${getDateFromTimestamp(data.valid_till_timestamp)}`);
     }
   }
 
@@ -198,11 +195,9 @@ function listServers(context) {
 
 //-----------------------------------------------------------
 function printHelp(context) {
-  context.write(
-    `${BOT_NAME} list\n${
-      BOT_NAME} get <server>\n${
-      BOT_NAME} free <server>\n`,
-  );
+  context.write(`${BOT_NAME} list
+${BOT_NAME} get <server>
+${BOT_NAME} free <server>`);
 }
 
 //-----------------------------------------------------------
@@ -215,7 +210,7 @@ function checkServersLoop() {
 
     const channel = rtm.dataStore.getChannelByName(BOT_CHANNEL);
     if (!channel) {
-      console.log('Cant find channel', BOT_CHANNEL, '(absent or private)');
+      console.log(`Cant find channel ${BOT_CHANNEL} (absent or private)`);
       return;
     }
 
@@ -250,9 +245,9 @@ function freeServerByBot(server, data, channelId) {
     data.ownerDM = undefined;
     writeServerData(server, data);
 
-    rtm.sendMessage(`${server} released by bot\n<@${lastowner}> lost ownership`, channelId);
+    rtm.sendMessage(`${server} released by bot\n${lastowner} lost ownership`, channelId);
     if (lastownerDM) {
-      rtm.sendMessage(`${server} released by bot\n<@${lastowner}> lost ownership`, lastownerDM);
+      rtm.sendMessage(`${server} released by bot\n${lastowner} lost ownership`, lastownerDM);
     }
   }
 }
