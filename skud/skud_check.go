@@ -186,11 +186,11 @@ func todayUsers(conn *sql.DB) (res []string) {
 		rows.Scan(&userName, &date, &tatype)
 
 		if tatype == "1" {
-			area = "Вход"
+			area = "Вход "
 		} else {
 			area = "Выход"
 		}
-		fmt.Printf("%s %s\t%s\n", date[11:16], area, userName)
+		fmt.Printf("%s %s %s\n", date[11:16], area, userName)
 	}
 	return
 }
