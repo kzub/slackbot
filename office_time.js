@@ -81,8 +81,13 @@ function processUserMessage(message, msgChannelId) {
       checkUserAtSkud(message, cb);
     },
     (cb) => {
+      if (message === 'today' || message === 'сегодня') {
+        cb(undefined, {});
+        return;
+      }
+
       checkUserAtKeepteam(message, (err, res) => {
-        cb(undefined, res || {});
+        cb(undefined, res);
       });
     }
   ], (err, result) =>{
@@ -92,7 +97,7 @@ function processUserMessage(message, msgChannelId) {
     }
     let response = [];
     let skud = result[0];
-    let kt = result[1];
+    let kt = result[1] || {};
 
     if(!skud.length){
       rtm.sendMessage('Не найдено. Имена и фамилии, пишутся с большой буквы.', msgChannelId);
