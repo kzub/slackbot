@@ -44,9 +44,7 @@ function getSlackChannel(channelId) {
 
 function processAdminMessage(message, msgChannelId) {
   const parts = message.split(' ');
-  const cmd = parts[0];
-  const channel = parts[1];
-  const name = parts[2];
+  const [cmd, channel, name]  = parts;
 
   if (cmd === 'add') {
     const user = rtm.dataStore.getUserByName(name);

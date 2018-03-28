@@ -165,6 +165,36 @@ func lateUsers(conn *sql.DB) (res []string) {
 	return
 }
 
+func todayUsers(conn *sql.DB) (res []string) {
+	dayBegin := time.Now().String()[:10] + " 04:00:00"
+	now := time.Now().String()[:10] + " 23:59:59"
+	query := fmt.Sprintf(
+		`SELECT u.USER_NAME, EV_DATETIME, TA_TYPE from TALOG ta
+		LEFT JOIN V_USERS u ON ta.USER_ID = u.USER_ID
+		WHERE EV_DATETIME  BETWEEN '%s' AND '%s' order by EV_DATETIME ASC`, dayBegin, now)
+
+	rows, err := conn.Query(query)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer rows.Close()
+
+	var userName, date, tatype, area string
+
+	for rows.Next() {
+		rows.Scan(&userName, &date, &tatype)
+
+		if tatype == "1" {
+			area = "Вход"
+		} else {
+			area = "Выход"
+		}
+		fmt.Printf("%s %s\t%s\n", date[11:16], area, userName)
+	}
+	return
+}
+
 func main() {
 	conn, _ := sql.Open("firebirdsql", os.Getenv("DBPATH"))
 	defer conn.Close()
@@ -173,6 +203,10 @@ func main() {
 		name := strings.Join(os.Args[1:], " ")
 		if name == "late" {
 			lateUsers(conn)
+			return
+		}
+		if name == "today" || name == "сегодня" {
+			todayUsers(conn)
 			return
 		}
 		users := scanUsers(conn, name)
