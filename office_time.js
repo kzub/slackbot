@@ -104,7 +104,7 @@ function processUserMessage(message, msgChannelId) {
       return;
     }
 
-    let lines = skud.split('\r\n');
+    let lines = skud.split('\n');
     let lastDate;
     for (const idx in lines) {
       let line = lines[idx];
@@ -123,8 +123,11 @@ function processUserMessage(message, msgChannelId) {
       }
       response.push(line);
     }
-    // console.log('```' + response.join('\r\n') + '```');
-    rtm.sendMessage('```' + response.join('\r\n') + '```', msgChannelId);
+
+    while (response.length) {
+      let res = response.splice(0, 200);
+      rtm.sendMessage('```' + res.join('\n') + '```', msgChannelId);
+    }
   });
 }
 
