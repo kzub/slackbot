@@ -374,16 +374,23 @@ function parseMessage(message) {
 
 //-----------------------------------------------------------
 function getClaimTimeRight(claimTimeOverride) {
-  if (!Number.isFinite(claimTimeOverride)) {
-    claimTimeOverride = undefined;
+  if (Number.isFinite(claimTimeOverride)) {
+    const validTillDate = new Date(claimTimeOverride);
+    return validTillDate.valueOf();
   }
-  const claimTime = new Date(Date.now() + (claimTimeOverride || CLIAM_TIME));
-  const dayOfWeek = claimTime.getDay();
+
+  const dayEnd = Date.now();
+  dayEnd.setHours(23);
+  dayEnd.setMinutes(59);
+  dayEnd.setSeconds(59);
+
+  // const claimTime = new Date(Date.now() + CLIAM_TIME);
   // weekends are not counted
-  if (dayOfWeek === 0 || dayOfWeek === 6) {
-    claimTime.setHours(claimTime.getHours() + 48);
-  }
-  return claimTime.valueOf();
+  // const dayOfWeek = claimTime.getDay();
+  // if (dayOfWeek === 0 || dayOfWeek === 6) {
+  //   claimTime.setHours(claimTime.getHours() + 48);
+  // }
+  return dayEnd.valueOf();
 }
 
 //-----------------------------------------------------------
