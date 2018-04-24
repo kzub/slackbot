@@ -379,7 +379,7 @@ function getClaimTimeRight(claimTimeOverride) {
     return validTillDate.valueOf();
   }
 
-  const dayEnd = Date.now();
+  const dayEnd = new Date();
   dayEnd.setHours(23);
   dayEnd.setMinutes(59);
   dayEnd.setSeconds(59);
