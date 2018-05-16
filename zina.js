@@ -381,8 +381,12 @@ function getClaimTimeRight(claimTimeOverride) {
 
   const dayEnd = new Date();
   dayEnd.setHours(23);
-  dayEnd.setMinutes(59);
-  dayEnd.setSeconds(59);
+
+  // чтобы обойти лимиты slack на отпавку сообщений 1 в секунду.
+  const randomMin = Math.floor(Math.random()*59);
+  const randomSec = Math.floor(Math.random()*59);
+  dayEnd.setMinutes(randomMin);
+  dayEnd.setSeconds(randomSec);
 
   // const claimTime = new Date(Date.now() + CLIAM_TIME);
   // weekends are not counted
