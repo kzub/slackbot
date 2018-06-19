@@ -85,6 +85,7 @@ func printDays(days map[string]int64, additionalInfo map[string]string) {
 		sortedDays = append(sortedDays, day)
 	}
 	sortedDays = addAbsentDates(sortedDays)
+	sortedDays = cutDays(sortedDays, 30)
 
 	for _, day := range sortedDays {
 		duration, _ := getDayHours(days[day])
@@ -103,6 +104,7 @@ func printWeeks(days map[string]int64) {
 		sortedDays = append(sortedDays, dayi)
 	}
 	sortedDays = addAbsentDates(sortedDays)
+	sortedDays = cutDays(sortedDays, 60)
 
 	for _, day := range sortedDays {
 		week := getWeek(day)
@@ -126,6 +128,14 @@ func printWeeks(days map[string]int64) {
 		printTime := getHourFormat(duration)
 		fmt.Printf("week: %.2d hours: %s %c\r\n", week, printTime, badHoursDetected[week])
 	}
+}
+
+func cutDays(days []string, size int) []string {
+	l := len(days)
+	if l > size {
+		return days[l-size : l]
+	}
+	return days
 }
 
 func lateUsers(conn *sql.DB) (res []string) {
