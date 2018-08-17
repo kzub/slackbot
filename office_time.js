@@ -52,6 +52,9 @@ rtm.on(RTM_EVENTS.MESSAGE, (message) => {
       console.log('error getting slackuser', message);
       return;
     }
+    if (isMyself(message.user)) {
+      return;
+    }
     const direct = isSlackDirectChannel(message.channel);
     if (!direct) {
       // not direct message
@@ -200,6 +203,10 @@ function getSlackChannel(channelId) {
     return;
   }
   return chanobj.name;
+}
+
+function isMyself(userId) {
+  return userId === config.botUserId;
 }
 
 function isSlackDirectChannel(channelId) {
