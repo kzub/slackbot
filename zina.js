@@ -246,9 +246,11 @@ function freeServerByBot(server, data, channelId) {
     writeServerData(server, data);
 
     rtm.sendMessage(`${server} released by bot\n${lastowner} lost ownership`, channelId);
-    if (lastownerDM) {
-      rtm.sendMessage(`${server} released by bot\n${lastowner} lost ownership`, lastownerDM);
-    }
+
+    // deactivated for better sleep. pls if needed add option for deactivation
+    // if (lastownerDM) {
+    //   rtm.sendMessage(`${server} released by bot\n${lastowner} lost ownership`, lastownerDM);
+    // }
   }
 }
 
