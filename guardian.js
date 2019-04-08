@@ -46,11 +46,22 @@ function processAdminMessage(message, msgChannelId) {
   const parts = message.split(' ');
   const [cmd, channel, name]  = parts;
 
-  if (cmd === 'add') {
-    const user = rtm.dataStore.getUserByName(name);
-    if (!user) {
-      rtm.sendMessage(`failed. unknown user ${name}`, msgChannelId);
-      return;
+  if (cmd === 'add' || cmd === 'addId') {
+    if (cmd === 'add') {
+      const user = rtm.dataStore.getUserByName(name);
+      if (!user) {
+        console.log('not found user:', name, user)
+        rtm.sendMessage(`failed. unknown user ${name}`, msgChannelId);
+        return;
+      }
+    } else {
+      const user = getSlackUser(name);
+      if (!user) {
+        console.log('not found userId:', name, user)
+        rtm.sendMessage(`failed. unknown userId ${name}`, msgChannelId);
+        return;
+      }
+      nameOverride = user;
     }
     const channelId = rtm.dataStore.getChannelByName(channel);
     if (!channelId) {
@@ -61,7 +72,7 @@ function processAdminMessage(message, msgChannelId) {
     if (!config.protect[channel]) {
       config.protect[channel] = {};
     }
-    config.protect[channel][name] = true;
+    config.protect[channel][nameOverride || name] = true;
     fs.writeFileSync(configName, JSON.stringify(config));
     rtm.sendMessage('ok', msgChannelId);
   }
