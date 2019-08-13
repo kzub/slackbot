@@ -1,45 +1,94 @@
-const slack = require('@slack/client');
+const slack = require('@slack/rtm-api');
 const fs = require('fs');
 const request = require('request');
+const express = require('express');
+const bodyParser = require('body-parser');
 
 const BOT_NAME = 'zina';
 const BOT_CHANNEL = 'claim_channel';
 const SERVERSLIST_DIR = 'servers';
 const INFO_DIR = 'info';
-// const CLIAM_TIME = 1000*60*2;
-const CLIAM_TIME = 1000 * 60 * 60 * 48;
-const DESTROY_TIME = 1000 * 60 * 60;
+const DEFAULT_CLIAM_TIME = 1000 * 60 * 60 * 24;
 const CHECK_SERVERS_STATUS_INTERVAL = 1000 * 10;
+let BOT_CHANNEL_ID;
 
-const RtmClient = slack.RtmClient;
-const CLIENT_EVENTS = slack.CLIENT_EVENTS;
-const RTM_EVENTS = slack.RTM_EVENTS;
-const MemoryDataStore = slack.MemoryDataStore;
-const token = process.env.SLACK_API_TOKEN;
+const app = express();
+const { host, port } = process.env;
 
-const rtm = new RtmClient(token, {
-  logLevel: 'error', // check this out for more on logger: https://github.com/winstonjs/winston
-  dataStore: new MemoryDataStore(), // pass a new MemoryDataStore instance to cache information
+app.use(bodyParser.json());
+app.listen(port, host, () => {
+  console.log(`Zina listening on port ${host}:${port}!`);
+});
+
+
+// Webhook. Принимает результат создания новой виртуалки и отправляет владельцу в чат
+// Формат: { "serverName": "beta-00", "action": "bootstrap", "result": "ok" }
+app.post('/webhook', (req, res) => {
+  const { serverName, action, result } = req.body;
+  console.log('/webhook', req.body);
+
+  if (!serverName) {
+    console.log('ERROR: bad webhook format');
+    res.status(400).end('bad webhook format');
+    return;
+  }
+
+  if (result == 'ok') {
+    notifyServerOwner(serverName, `Jenkins: ${serverName} ${action} ok`);
+  } else {
+    notifyServerOwner(serverName, `Jenkins: ${serverName} ${action} error!\nCall for help -> #ops-duty`);
+  }
+  res.json({ ok: true });
+});
+
+// ---------------------------------------
+function notifyServerOwner (serverName, message) {
+  const state = readServerState(serverName);
+  const toWhom = state.ownerDM || state.lastOwnerDM;
+  if (toWhom) {
+    rtm.sendMessage(message, toWhom);
+  }
+}
+
+const rtm = new slack.RTMClient(process.env.SLACK_API_TOKEN, {
+  logLevel: slack.LogLevel.INFO
 });
 
 rtm.start();
 
-let rtmData;
-rtm.on(CLIENT_EVENTS.RTM.AUTHENTICATED, (rtmStartData) => {
-  console.log('RTM client authenticated!'/* , Object.keys(rtmStartData) */);
-  rtmData = rtmStartData;
+rtm.on('connected', () => {
+  console.log('RTM client authenticated! userId:', rtm.activeUserId);
+
+  rtm.webClient.channels.list().then(res => {
+    if (!res.ok) {
+      console.log('ERROR channels.list() not ok');
+      return;
+    }
+    BOT_CHANNEL_ID = res.channels.filter(chan => chan.name === BOT_CHANNEL).pop();
+  });
 });
 
-function getDirectMsgChannel(userId) {
-  for (const i in rtmData.ims) {
-    if (rtmData.ims[i].user === userId) {
-      return rtmData.ims[i].id;
-    }
+//-----------------------------------------------------------
+async function getSlackUser(userId) {
+  const res = await rtm.webClient.users.info({ user: userId });
+  if (!res.ok) {
+    return null;
   }
-  return null;
+  return res.user.name;
 }
 
-rtm.on(RTM_EVENTS.MESSAGE, (message) => {
+//-----------------------------------------------------------
+async function getDirectMsgChannel(userId) {
+  const res = await rtm.webClient.im.open({ user: userId });
+  
+  if (!res.ok) {
+    return;
+  }
+  return res.channel.id;
+}
+
+//-----------------------------------------------------------
+rtm.on('message', async (message) => {
   let context;
   let slackuser;
   try {
@@ -47,29 +96,31 @@ rtm.on(RTM_EVENTS.MESSAGE, (message) => {
       return;
     }
 
-    slackuser = getSlackUser(message.user);
+    slackuser = await getSlackUser(message.user);
     if (!slackuser) {
       return;
     }
 
-    const data = parseMessage(message.text);
+    const data = await parseMessage(message);
     if (!data) {
       return;
     }
+    console.log(data)
 
     context = {
       slackuser,
-      slackuserDM: getDirectMsgChannel(message.user),
-      write(msg) {
+      slackuserDM: await getDirectMsgChannel(message.user),
+      sendMessage(msg) {
         rtm.sendMessage(msg, message.channel);
       },
     };
+
     switch (data.cmd) {
       case 'get':
-        context.server = data.params[0];
+        context.serverName = data.params[0];
         claimServer(context); break;
       case 'free':
-        context.server = data.params[0];
+        context.serverName = data.params[0];
         unClaimServer(context); break;
       case 'list':
         listServers(context); break;
@@ -80,95 +131,71 @@ rtm.on(RTM_EVENTS.MESSAGE, (message) => {
   } catch (err) {
     console.error(err, err.stack);
     const result = typeof (err) === 'string' ? err : 'Internal error';
-    context.write(`${slackuser} ${result}`);
+    context.sendMessage(`${slackuser} ${result}`);
   }
 });
 
-//-----------------------------------------------------------
-function getSlackUser(user) {
-  const userobj = rtm.dataStore.getUserById(user);
-  if (!userobj) {
-    return null;
-  }
-  return userobj.name;
-}
 
 //-----------------------------------------------------------
 function claimServer(context) {
-  const data = readServerData(context.server);
-
-  if (context.server.indexOf('dev-linode') > -1) {
-    context.write(`ERROR. ${context.server} outdated. Use sandbox-**`);
-    return;
-  }
+  const state = readServerState(context.serverName);
 
   const currentTime = Date.now();
-  if (data.valid_till_timestamp && context.slackuser !== data.owner) {
-    if (currentTime < data.valid_till_timestamp) {
-      context.write(`ERROR. ${context.server} is owned by ${data.owner} till ${getDateFromTimestamp(data.valid_till_timestamp)}`);
+  if (state.valid_till_timestamp && context.slackuser !== state.owner) {
+    if (currentTime < state.valid_till_timestamp) {
+      context.sendMessage(`ERROR. ${context.serverName} is owned by ${state.owner} till ${getDateFromTimestamp(state.valid_till_timestamp)}`);
       return;
     }
   }
 
-  const userchange = data.owner && data.owner !== context.slackuser;
-  const lastOwner = data.owner;
-  let claimTimeOverride;
-  if (data.config.acquire_infinitely) {
-    claimTimeOverride = new Date('2020-02-02').valueOf();
-  }
-  data.valid_till_timestamp = getClaimTimeRight(claimTimeOverride);
-  data.owner = context.slackuser;
-  data.ownerDM = context.slackuserDM;
+  const userchange = state.owner && state.owner !== context.slackuser;
+  const lastOwner = state.owner;
 
-  writeServerData(context.server, data);
+  state.valid_till_timestamp = getClaimTimeRight(state._config);
+  state.owner = context.slackuser;
+  state.ownerDM = context.slackuserDM;
 
-  let result = `${context.server} is yours ${data.owner} till ${getDateFromTimestamp(data.valid_till_timestamp)}`;
+  writeServerState(state);
+
+  let result = `${context.serverName} is yours ${state.owner} till ${getDateFromTimestamp(state.valid_till_timestamp)}`;
   if (userchange) {
     result += `\n${lastOwner} lost ownership\n`;
   }
-  context.write(result);
+  context.sendMessage(result);
 
-  if (!data.server_created_timestamp) {
-    data.server_created_timestamp = Date.now();
-    if (data.config.webhook_create_server) {
-      webhookCreateServer(context, data.config.webhook_create_server, (err) => {
-        if (!err) {
-          // update server creation time
-          writeServerData(context.server, data);
-        }
-      });
-    }
+  if (state._config.dynamic_bootstrap) {
+    jenkinsCreateServer(context, state._config);
   }
 }
 
 //-----------------------------------------------------------
 function unClaimServer(context) {
-  const data = readServerData(context.server);
+  const state = readServerState(context.serverName);
   const currentTime = Date.now();
-  const expired = data.valid_till_timestamp < currentTime;
-  const lastOwner = data.owner;
+  const expired = state.valid_till_timestamp < currentTime;
+  const lastOwner = state.owner;
 
-  if (!expired && context.slackuser !== data.owner) {
-    context.write(`ERROR. ${context.server} is owned by ${data.owner}`);
+  if (!expired && context.slackuser !== state.owner) {
+    context.sendMessage(`ERROR. ${context.serverName} is owned by ${state.owner}`);
     return;
   }
 
-  data.valid_till_timestamp = currentTime;
-  data.owner = undefined;
-  writeServerData(context.server, data);
+  state.valid_till_timestamp = currentTime;
+  state.owner = undefined;
+  writeServerState(state);
 
-  let result = `${context.server} is free`;
+  let result = `${context.serverName} is free`;
   if (lastOwner) {
     result += `\n${lastOwner} lost ownership`;
   }
-  context.write(result);
+  context.sendMessage(result);
 }
 
 //-----------------------------------------------------------
 function compareServerName(objA, objB) {
-  if (objA.server < objB.server) {
+  if (objA.serverName < objB.serverName) {
     return -1;
-  } else if (objA.server > objB.server) {
+  } else if (objA.serverName > objB.serverName) {
     return +1;
   }
   return 0;
@@ -177,27 +204,26 @@ function compareServerName(objA, objB) {
 
 //-----------------------------------------------------------
 function listServers(context) {
-  const datas = readServersData();
+  const states = readAllServersState();
   const result = [];
   const currentTime = Date.now();
 
-  for (const idx in datas) {
-    const data = datas[idx];
-    if (!data.valid_till_timestamp || data.valid_till_timestamp <= currentTime) {
-      result.push(`${data.server} is free`);
+  for (const state of states) {
+    if (!state.valid_till_timestamp || state.valid_till_timestamp <= currentTime) {
+      result.push(`${state._serverName} is free`);
     } else {
-      result.push(`${data.server} is owned by ${data.owner} till ${getDateFromTimestamp(data.valid_till_timestamp)}`);
+      result.push(`${state._serverName} is owned by ${state.owner} till ${getDateFromTimestamp(state.valid_till_timestamp)}`);
     }
   }
 
-  context.write(result.join('\n'));
+  context.sendMessage(result.join('\n'));
 }
 
 //-----------------------------------------------------------
 function printHelp(context) {
-  context.write(`${BOT_NAME} list
-${BOT_NAME} get <server>
-${BOT_NAME} free <server>`);
+  context.sendMessage(`list
+get <server>
+free <server>`);
 }
 
 //-----------------------------------------------------------
@@ -207,135 +233,146 @@ function checkServersLoop() {
       console.log('checkServersLoop: not connected...');
       return;
     }
-
-    const channel = rtm.dataStore.getChannelByName(BOT_CHANNEL);
-    if (!channel) {
-      console.log(`Cant find channel ${BOT_CHANNEL} (absent or private)`);
+    if (!BOT_CHANNEL_ID) {
+      console.log('checkServersLoop: channel id not set');
       return;
     }
-
-    const result = [];
+    
     const currentTime = Date.now();
-    const datas = readServersData();
+    const states = readAllServersState();
 
-    for (const idx in datas) {
-      const data = datas[idx];
-      if (!data.valid_till_timestamp) {
+    for (const state of states) {
+      if (!state.valid_till_timestamp) {
         continue;
       }
-      if (data.valid_till_timestamp < currentTime) {
-        freeServerByBot(data.server, data, channel.id);
+      if (state.valid_till_timestamp < currentTime) {
+        freeServerByBot(state, BOT_CHANNEL_ID);
       }
-      if (data.valid_till_timestamp + DESTROY_TIME < currentTime) {
-        destroyServerByBot(data.server, data, channel.id);
+      if (state.valid_till_timestamp + state._config.unclaim_to_destroy_time < currentTime) {
+        destroyServerByBot(state, BOT_CHANNEL_ID);
       }
     }
-  } catch (e) {
-    console.error('loop', e);
+  } catch (err) {
+    console.log('ERROR checkServersLoop()', err);
   }
 }
 setInterval(checkServersLoop, CHECK_SERVERS_STATUS_INTERVAL);
 
 //-----------------------------------------------------------
-function freeServerByBot(server, data, channelId) {
-  if (data.owner) {
-    const lastowner = data.owner;
-    const lastownerDM = data.ownerDM;
-    data.owner = undefined;
-    data.ownerDM = undefined;
-    writeServerData(server, data);
+function freeServerByBot(state, channelId) {
+  if (state.owner) {
+    const lastOwner = state.owner;
+    const lastOwnerDM = state.ownerDM;
+    state.lastOwnerDM = state.ownerDM;
+    state.owner = undefined;
+    state.ownerDM = undefined;
+    writeServerState(state);
 
-    rtm.sendMessage(`${server} released by bot\n${lastowner} lost ownership`, channelId);
-
-    // deactivated for better sleep. pls if needed add option for deactivation
-    // if (lastownerDM) {
-    //   rtm.sendMessage(`${server} released by bot\n${lastowner} lost ownership`, lastownerDM);
-    // }
-  }
-}
-
-//-----------------------------------------------------------
-function destroyServerByBot(server, data, channelId) {
-  if (data.server_created_timestamp) {
-    data.server_created_timestamp = undefined;
-    writeServerData(server, data);
-
-    if (data.config.webhook_destroy_server) {
-      const context = {
-        server,
-        write(msg) {
-          rtm.sendMessage(msg, channelId);
-        },
-      };
-      webhookDestroyServer(context, data.config.webhook_destroy_server);
+    rtm.sendMessage(`${state._serverName} released by bot\n${lastOwner} lost ownership`, channelId);
+    if (lastOwnerDM) {
+      rtm.sendMessage(`${state._serverName} released by bot`, lastOwnerDM);
     }
   }
 }
 
 //-----------------------------------------------------------
-function webhookCreateServer(context, url, callback) {
-  context.write(`Jenkins: ${context.server} being created...`);
-  request(url, (err, data) => {
-    if (err) {
-      context.write(`Jenkins: ${context.server} CREATING ERROR!`);
-      console.log('webhook_create_server ERR', err);
-    } else {
-      context.write(`Jenkins: ${context.server} created!`);
-    }
-    if (callback) { callback(err); }
-  });
+function destroyServerByBot(state, channelId) {
+  const context = {
+    serverName: state._serverName,
+    sendMessage(msg) {
+      rtm.sendMessage(msg, channelId);
+      if (state.lastOwnerDM) {
+        rtm.sendMessage(msg, state.lastOwnerDM);
+      }
+    },
+  };
+  jenkinsDestroyServer(context, state._config);
 }
 
-function webhookDestroyServer(context, url) {
-  context.write(`Jenkins: ${context.server} being destroyed...`);
-  request(url, (err, data) => {
-    if (err) {
-      context.write(`Jenkins: ${context.server} DESTROYING ERROR!`);
-      console.log('webhook_destroy_server ERR', context.server, url, err);
+//-----------------------------------------------------------
+function jenkinsCreateServer(context, config) {
+  request.post({
+    url: config.bootstap_url,
+    headers: config.jenkins_headers,
+    timeout: 10000,
+    form: {
+      data: encodeURIComponent(JSON.stringify(config.bootstrap_payload)),
+    },
+  }, (err, httpResponse) => {
+    // console.log(err, httpResponse, body)
+    if (err || (httpResponse && httpResponse.statusCode !== 200)) {
+      context.sendMessage(`Jenkins: ${context.serverName} bootstap error!
+${httpResponse.statusCode} ${httpResponse.statusMessage}
+Call for help -> #ops_duty`);
+      console.log('ERROR jenkinsCreateServer()', context.serverName, httpResponse && httpResponse.statusCode, httpResponse && httpResponse.statusMessage, err);
     } else {
-      context.write(`Jenkins: ${context.server} demolished!`);
+      context.sendMessage(`Jenkins: ${context.serverName} bootstrap in progress ...`);
     }
   });
 }
 
-//-----------------------------------------------------------
-function readServerData(server) {
-  const data = {};
-  try {
-    const serverFileName = [SERVERSLIST_DIR, server].join('/');
-    data.config = JSON.parse(fs.readFileSync(serverFileName));
-  } catch (e) {
-    if (e.code === 'ENOENT') {
-      throw new Error(`Unknown server: ${server}`);
+function jenkinsDestroyServer(context, config) {
+  request.post({
+    url: config.destroy_url,
+    headers: config.jenkins_headers,
+    timeout: 10000,
+    form: {
+      data: encodeURIComponent(config.destroy_payload),
+    },
+  }, (err, httpResponse) => {
+    if (err || (httpResponse && httpResponse.statusCode !== 200)) {
+      context.sendMessage(`Jenkins: ${context.serverName} destroy error!
+${httpResponse.statusCode} ${httpResponse.statusMessage}
+Call for help -> #ops_duty`);
+      console.log('ERROR jenkinsCreateServer()', context.serverName, httpResponse && httpResponse.statusCode, httpResponse && httpResponse.statusMessage, err);
+    } else {
+      context.sendMessage(`Jenkins: ${context.serverName} destroy in progress ...`);
     }
-    console.error(e);
-    throw new Error(`Internal error while reading: ${server}`);
+  });
+}
+
+//-----------------------------------------------------------
+function readServerState(serverName) {
+  const state = {};
+
+  // config
+  const serverFileName = [SERVERSLIST_DIR, serverName].join('/');
+  try {
+    state._config = JSON.parse(fs.readFileSync(serverFileName));
+    state._serverName = serverName;
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      throw new Error(`Unknown server: ${serverName}`);
+    }
+    console.log('ERROR readServerState() config', serverFileName, err);
+    throw new Error(`Internal error while reading: ${serverName}`);
   }
 
+  // state
+  const stateFileName = [INFO_DIR, serverName].join('/');
   try {
-    const infoFileName = [INFO_DIR, server].join('/');
-    const info = JSON.parse(fs.readFileSync(infoFileName));
+    const info = JSON.parse(fs.readFileSync(stateFileName));
     for (const key in info) {
-      data[key] = info[key];
+      state[key] = info[key];
     }
-  } catch (e) {
-    if (e.code !== 'ENOENT') {
-      console.error('error reading info:', server, e);
+  } catch (err) {
+    if (err.code !== 'ENOENT') {
+      console.log('ERROR readServerState() state', stateFileName, err);
     }
   }
-  data.server = server;
-  return data;
+  
+  return state;
 }
 
 //-----------------------------------------------------------
-function readServersData() {
+function readAllServersState() {
   const serversList = fs.readdirSync(SERVERSLIST_DIR);
   const result = [];
 
   for (const idx in serversList) {
-    const server = serversList[idx];
-    const data = readServerData(server);
-    result.push(data);
+    const serverName = serversList[idx];
+    const state = readServerState(serverName);
+    result.push(state);
   }
 
   result.sort(compareServerName);
@@ -343,30 +380,46 @@ function readServersData() {
 }
 
 //-----------------------------------------------------------
-function writeServerData(server, data) {
-  const serverFileName = [INFO_DIR, server].join('/');
-  const dataCopy = JSON.parse(JSON.stringify(data));
-  delete dataCopy.config;
-  fs.writeFileSync(serverFileName, JSON.stringify(dataCopy));
+function writeServerState(state) {
+  const serverFileName = [INFO_DIR, state._serverName].join('/');
+  const stateCopy = JSON.parse(JSON.stringify(state));
+  delete stateCopy._config;
+  delete stateCopy._serverName;
+  fs.writeFileSync(serverFileName, JSON.stringify(stateCopy));
 }
 
 //-----------------------------------------------------------
-function parseMessage(message) {
-  if (!message) return null;
+async function parseMessage(message) {
+  let text = message.text;
 
-  if (message[0] === '<' && message[1] === '@') {
-    const usernameEnd = message.indexOf('>');
-    const user = message.slice(2, usernameEnd);
-    const slackuser = getSlackUser(user);
+  if (!text) {
+    return null;
+  }
+
+  if (message.channel.startsWith('DM')) { // direct message
+    if (text.startsWith(BOT_NAME)) {
+      text = text.slice(BOT_NAME.length + 1);
+    }
+    const parts = text.split(' ');
+    return {
+      cmd: parts[0],
+      params: parts.slice(1),
+    };
+  }
+
+  if (text[0] === '<' && text[1] === '@') {
+    const usernameEnd = text.indexOf('>');
+    const user = text.slice(2, usernameEnd);
+    const slackuser = await getSlackUser(user);
     if (!slackuser || slackuser.indexOf(BOT_NAME) !== 0) {
       return null;
     }
   }
-  else if (message.indexOf(BOT_NAME) !== 0) {
+  else if (text.indexOf(BOT_NAME) !== 0) {
     return null;
   }
 
-  const parts = message.split(' ');
+  const parts = text.split(' ');
 
   return {
     cmd: parts[1],
@@ -375,28 +428,37 @@ function parseMessage(message) {
 }
 
 //-----------------------------------------------------------
-function getClaimTimeRight(claimTimeOverride) {
-  if (Number.isFinite(claimTimeOverride)) {
-    const validTillDate = new Date(claimTimeOverride);
-    return validTillDate.valueOf();
+function getClaimTimeRight(config) {
+  // до конца дня
+  if (config.claim_till_day_end) {
+    const dayEnd = new Date();
+    dayEnd.setHours(23);
+
+    // чтобы обойти лимиты slack на отпавку сообщений 1 в секунду.
+    const randomMin = Math.floor(Math.random()*59);
+    const randomSec = Math.floor(Math.random()*59);
+    dayEnd.setMinutes(randomMin);
+    dayEnd.setSeconds(randomSec);
+
+    return dayEnd.valueOf();
+  }
+ 
+  // в конфиге задано количество времени (милисекунд) отведенных на владение
+  if (isFinite(config.claim_time)) {
+    return Date.now() + config.claim_time;
   }
 
-  const dayEnd = new Date();
-  dayEnd.setHours(23);
-
-  // чтобы обойти лимиты slack на отпавку сообщений 1 в секунду.
-  const randomMin = Math.floor(Math.random()*59);
-  const randomSec = Math.floor(Math.random()*59);
-  dayEnd.setMinutes(randomMin);
-  dayEnd.setSeconds(randomSec);
-
-  // const claimTime = new Date(Date.now() + CLIAM_TIME);
+  // режим по умолчанию
+  const claimTime = new Date(Date.now() + DEFAULT_CLIAM_TIME);
+  const dayOfWeek = claimTime.getDay();
   // weekends are not counted
-  // const dayOfWeek = claimTime.getDay();
-  // if (dayOfWeek === 0 || dayOfWeek === 6) {
-  //   claimTime.setHours(claimTime.getHours() + 48);
-  // }
-  return dayEnd.valueOf();
+  if (dayOfWeek === 0) { // воскресенье
+    claimTime.setHours(claimTime.getHours() + 24);
+  }
+  else if (dayOfWeek === 6) { // суббота
+    claimTime.setHours(claimTime.getHours() + 48);
+  }
+  return claimTime.valueOf();
 }
 
 //-----------------------------------------------------------
