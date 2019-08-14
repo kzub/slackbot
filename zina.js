@@ -297,9 +297,7 @@ function jenkinsCreateServer(context, config) {
     url: config.bootstap_url,
     headers: config.jenkins_headers,
     timeout: 10000,
-    form: {
-      data: JSON.stringify(config.bootstrap_payload),
-    },
+    form: config.bootstrap_payload,
   }, (err, httpResponse) => {
     // console.log(err, httpResponse, body)
     if (err) {
@@ -324,9 +322,7 @@ function jenkinsDestroyServer(context, config) {
     url: config.destroy_url,
     headers: config.jenkins_headers,
     timeout: 10000,
-    form: {
-      data: JSON.stringify(config.destroy_payload),
-    },
+    form: config.destroy_payload,
   }, (err, httpResponse) => {
         if (err) {
       context.sendMessage(`Jenkins: ${context.serverName} bootstap error!`);
