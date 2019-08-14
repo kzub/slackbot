@@ -248,7 +248,7 @@ function checkServersLoop() {
       if (state.valid_till_timestamp < currentTime) {
         freeServerByBot(state, BOT_CHANNEL_ID);
       }
-      if (!state.destroyed && (state.valid_till_timestamp + state._config.unclaim_to_destroy_time < currentTime)) {
+      if (state.valid_till_timestamp + state._config.unclaim_to_destroy_time < currentTime) {
         destroyServerByBot(state, BOT_CHANNEL_ID);
       }
     }
@@ -286,7 +286,7 @@ function destroyServerByBot(state, channelId) {
       }
     },
   };
-  state.destroyed = true;
+  state.valid_till_timestamp = undefined;
   writeServerState(state);
   jenkinsDestroyServer(context, state._config);
 }
