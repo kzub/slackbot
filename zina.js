@@ -307,7 +307,7 @@ function jenkinsCreateServer(context, config) {
       console.log('ERROR jenkinsCreateServer(1)', context.serverName, err);
       return;
     }
-    if (httpResponse && httpResponse.statusCode !== 200) {
+    if (httpResponse && httpResponse.statusCode !== 201) {
       context.sendMessage(`Jenkins: ${context.serverName} bootstap error!
 ${httpResponse.statusCode} ${httpResponse.statusMessage}
 Call for help -> #ops_duty`);
@@ -333,7 +333,7 @@ function jenkinsDestroyServer(context, config) {
       console.log('ERROR jenkinsDestroyServer(1)', context.serverName, err);
       return;
     }
-    if (httpResponse && httpResponse.statusCode !== 200) {
+    if (httpResponse && httpResponse.statusCode !== 201) {
       context.sendMessage(`Jenkins: ${context.serverName} bootstap error!
 ${httpResponse.statusCode} ${httpResponse.statusMessage}
 Call for help -> #ops_duty`);
