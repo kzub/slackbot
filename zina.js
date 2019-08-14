@@ -298,18 +298,24 @@ function jenkinsCreateServer(context, config) {
     headers: config.jenkins_headers,
     timeout: 10000,
     form: {
-      data: encodeURIComponent(JSON.stringify(config.bootstrap_payload)),
+      data: JSON.stringify(config.bootstrap_payload),
     },
   }, (err, httpResponse) => {
     // console.log(err, httpResponse, body)
-    if (err || (httpResponse && httpResponse.statusCode !== 200)) {
+    if (err) {
+      context.sendMessage(`Jenkins: ${context.serverName} bootstap error!`);
+      console.log('ERROR jenkinsCreateServer(1)', context.serverName, err);
+      return;
+    }
+    if (httpResponse && httpResponse.statusCode !== 200) {
       context.sendMessage(`Jenkins: ${context.serverName} bootstap error!
 ${httpResponse.statusCode} ${httpResponse.statusMessage}
 Call for help -> #ops_duty`);
-      console.log('ERROR jenkinsCreateServer()', context.serverName, httpResponse && httpResponse.statusCode, httpResponse && httpResponse.statusMessage, err);
-    } else {
-      context.sendMessage(`Jenkins: ${context.serverName} bootstrap in progress ...`);
+      console.log('ERROR jenkinsCreateServer(2)', context.serverName, httpResponse && httpResponse.statusCode, httpResponse && httpResponse.statusMessage, err);
+      return;
     }
+
+    context.sendMessage(`Jenkins: ${context.serverName} bootstrap in progress ...`);
   });
 }
 
@@ -319,17 +325,22 @@ function jenkinsDestroyServer(context, config) {
     headers: config.jenkins_headers,
     timeout: 10000,
     form: {
-      data: encodeURIComponent(config.destroy_payload),
+      data: JSON.stringify(config.destroy_payload),
     },
   }, (err, httpResponse) => {
-    if (err || (httpResponse && httpResponse.statusCode !== 200)) {
-      context.sendMessage(`Jenkins: ${context.serverName} destroy error!
+        if (err) {
+      context.sendMessage(`Jenkins: ${context.serverName} bootstap error!`);
+      console.log('ERROR jenkinsDestroyServer(1)', context.serverName, err);
+      return;
+    }
+    if (httpResponse && httpResponse.statusCode !== 200) {
+      context.sendMessage(`Jenkins: ${context.serverName} bootstap error!
 ${httpResponse.statusCode} ${httpResponse.statusMessage}
 Call for help -> #ops_duty`);
-      console.log('ERROR jenkinsDestroyServer()', context.serverName, httpResponse && httpResponse.statusCode, httpResponse && httpResponse.statusMessage, err);
-    } else {
-      context.sendMessage(`Jenkins: ${context.serverName} destroy in progress ...`);
+      console.log('ERROR jenkinsDestroyServer(2)', context.serverName, httpResponse && httpResponse.statusCode, httpResponse && httpResponse.statusMessage, err);
+      return;
     }
+    context.sendMessage(`Jenkins: ${context.serverName} destroy in progress ...`);
   });
 }
 
