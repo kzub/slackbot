@@ -193,9 +193,9 @@ function unClaimServer(context) {
 
 //-----------------------------------------------------------
 function compareServerName(objA, objB) {
-  if (objA.serverName < objB.serverName) {
+  if (objA._serverName < objB._serverName) {
     return -1;
-  } else if (objA.serverName > objB.serverName) {
+  } else if (objA._serverName > objB._serverName) {
     return +1;
   }
   return 0;

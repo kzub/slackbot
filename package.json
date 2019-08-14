@@ -25,7 +25,7 @@
     "eslint-plugin-standard": "^3.0.1"
   },
   "engines": {
-    "node": ">= 4.x",
-    "npm": ">= 3.x"
+    "node": ">= 10.x",
+    "npm": ">= 6.x"
   }
 }
