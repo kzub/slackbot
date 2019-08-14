@@ -4,8 +4,8 @@ const request = require('request');
 const express = require('express');
 const bodyParser = require('body-parser');
 
-const BOT_NAME = 'zina';
-const BOT_CHANNEL = 'claim_channel';
+const BOT_NAME = process.env.BOT_NAME || 'zina';
+const BOT_CHANNEL = process.env.BOT_CHANNEL || 'claim_channel';
 const SERVERSLIST_DIR = 'servers';
 const INFO_DIR = 'info';
 const DEFAULT_CLIAM_TIME = 1000 * 60 * 60 * 24;
@@ -248,7 +248,7 @@ function checkServersLoop() {
       if (state.valid_till_timestamp < currentTime) {
         freeServerByBot(state, BOT_CHANNEL_ID);
       }
-      if (state.valid_till_timestamp + state._config.unclaim_to_destroy_time < currentTime) {
+      if (!state.destroyed && (state.valid_till_timestamp + state._config.unclaim_to_destroy_time < currentTime)) {
         destroyServerByBot(state, BOT_CHANNEL_ID);
       }
     }
@@ -286,6 +286,8 @@ function destroyServerByBot(state, channelId) {
       }
     },
   };
+  state.destroyed = true;
+  writeServerState(state);
   jenkinsDestroyServer(context, state._config);
 }
 
@@ -324,7 +326,7 @@ function jenkinsDestroyServer(context, config) {
       context.sendMessage(`Jenkins: ${context.serverName} destroy error!
 ${httpResponse.statusCode} ${httpResponse.statusMessage}
 Call for help -> #ops_duty`);
-      console.log('ERROR jenkinsCreateServer()', context.serverName, httpResponse && httpResponse.statusCode, httpResponse && httpResponse.statusMessage, err);
+      console.log('ERROR jenkinsDestroyServer()', context.serverName, httpResponse && httpResponse.statusCode, httpResponse && httpResponse.statusMessage, err);
     } else {
       context.sendMessage(`Jenkins: ${context.serverName} destroy in progress ...`);
     }
