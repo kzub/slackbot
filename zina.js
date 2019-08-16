@@ -175,7 +175,7 @@ function unClaimServer(context) {
   const expired = state.valid_till_timestamp < currentTime;
   const lastOwner = state.owner;
 
-  if (!expired && context.slackuser !== state.owner) {
+  if (!expired && state.owner && context.slackuser !== state.owner) {
     context.sendMessage(`ERROR. ${context.serverName} is owned by ${state.owner}`);
     return;
   }
