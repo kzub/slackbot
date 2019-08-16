@@ -1,4 +1,4 @@
-const slack = require('@slack/client');
+const slack = require('@slack/rtm-api');
 const fs = require('fs');
 const request = require('request');
 
@@ -10,14 +10,13 @@ const token = process.env.SLACK_API_TOKEN;
 const token2 = process.env.SLACK_API_TOKEN_LEGACY;
 const configName = 'guardian.conf';
 
-const rtm = new RtmClient(token, {
-  logLevel: 'error', // check this out for more on logger: https://github.com/winstonjs/winston
-  dataStore: new MemoryDataStore(), // pass a new MemoryDataStore instance to cache information
+const rtm = new slack.RTMClient(token, {
+  logLevel: slack.LogLevel.INFO
 });
 
 rtm.start();
 
-rtm.on(CLIENT_EVENTS.RTM.AUTHENTICATED, () => {
+rtm.on('connected', () => {
   console.log('RTM client authenticated!', new Date());
 });
 
@@ -108,7 +107,7 @@ function processAdminMessage(message, msgChannelId) {
   }
 }
 
-rtm.on(RTM_EVENTS.MESSAGE, (message) => {
+rtm.on('message', (message) => {
   try {
     if (!message.user || !message.text) {
       return;
