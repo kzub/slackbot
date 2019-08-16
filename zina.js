@@ -405,7 +405,7 @@ async function parseMessage(message) {
     return null;
   }
 
-  if (message.channel.startsWith('DM')) { // direct message
+  if (message.channel.startsWith('D')) { // direct message
     if (text.startsWith(BOT_NAME)) {
       text = text.slice(BOT_NAME.length + 1);
     }
