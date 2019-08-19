@@ -56,17 +56,33 @@ const rtm = new slack.RTMClient(process.env.SLACK_API_TOKEN, {
 
 rtm.start();
 
-rtm.on('connected', () => {
-  console.log('RTM client authenticated! userId:', rtm.activeUserId);
-
-  rtm.webClient.channels.list().then(res => {
-    if (!res.ok) {
-      console.log('ERROR channels.list() not ok');
-      return;
-    }
-    BOT_CHANNEL_ID = res.channels.filter(chan => chan.name === BOT_CHANNEL).pop();
-  });
+rtm.on('connected', async () => {
+  BOT_CHANNEL_ID = await getSlackChannelByName(BOT_CHANNEL);
+  console.log('RTM client authenticated! userId:', rtm.activeUserId, 'BOT_CHANNEL_ID', BOT_CHANNEL_ID);
 });
+
+//-----------------------------------------------------------
+async function getSlackChannelByName(name) {
+  let oneMoreStep = true;
+  let channels = [];
+  for (let res ; oneMoreStep == true;) {
+    res = await rtm.webClient.channels.list({
+      exclude_archived: true,
+      // limit: 500,
+      cursor:  res && res.response_metadata.next_cursor
+    });
+    if (!res.ok) {
+      return null;
+    }
+    channels = channels.concat(res.channels);
+    // console.log(res.channels.length, res.response_metadata.next_cursor, oneMoreStep)
+    oneMoreStep = res.response_metadata.next_cursor && res.response_metadata.next_cursor > 0;
+  }
+
+  // console.log(`TOTAL CHANNELS: ${channels.length}`);
+  const channel = channels.filter(m => m.name == name).pop();
+  return channel && channel.id;
+}
 
 //-----------------------------------------------------------
 async function getSlackUser(userId) {
