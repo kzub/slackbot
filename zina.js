@@ -279,6 +279,7 @@ function freeServerByBot(state, channelId) {
   if (state.owner) {
     const lastOwner = state.owner;
     const lastOwnerDM = state.ownerDM;
+    state.lastOwner = state.owner;
     state.lastOwnerDM = state.ownerDM;
     state.owner = undefined;
     state.ownerDM = undefined;
@@ -294,6 +295,7 @@ function freeServerByBot(state, channelId) {
 //-----------------------------------------------------------
 function destroyServerByBot(state, channelId) {
   const context = {
+    slackuser: state.lastOwner,
     serverName: state._serverName,
     sendMessage(msg) {
       rtm.sendMessage(msg, channelId);
@@ -309,11 +311,16 @@ function destroyServerByBot(state, channelId) {
 
 //-----------------------------------------------------------
 function jenkinsCreateServer(context, config) {
+  const payload = {
+    ...config.bootstrap_payload,
+    SLACK_USER: context.slackuser,
+  };
+
   request.post({
     url: config.bootstap_url,
     headers: config.jenkins_headers,
     timeout: 10000,
-    form: config.bootstrap_payload,
+    form: payload,
   }, (err, httpResponse) => {
     // console.log(err, httpResponse, body)
     if (err) {
@@ -334,11 +341,16 @@ Call for help -> #ops_duty`);
 }
 
 function jenkinsDestroyServer(context, config) {
+  const payload = {
+    ...config.destroy_payload,
+    SLACK_USER: context.slackuser,
+  };
+
   request.post({
     url: config.destroy_url,
     headers: config.jenkins_headers,
     timeout: 10000,
-    form: config.destroy_payload,
+    form: payload,
   }, (err, httpResponse) => {
         if (err) {
       context.sendMessage(`Jenkins: ${context.serverName} bootstap error!`);
