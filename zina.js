@@ -225,10 +225,14 @@ function listServers(context) {
   const currentTime = Date.now();
 
   for (const state of states) {
+    let dynamic = '';
+    if (state._config.dynamic_bootstrap) {
+      dynamic = ' (dynamic)';
+    }
     if (!state.valid_till_timestamp || state.valid_till_timestamp <= currentTime) {
-      result.push(`${state._serverName} is free`);
+      result.push(`${state._serverName}${dynamic} is free`);
     } else {
-      result.push(`${state._serverName} is owned by ${state.owner} till ${getDateFromTimestamp(state.valid_till_timestamp)}`);
+      result.push(`${state._serverName}${dynamic} is owned by ${state.owner} till ${getDateFromTimestamp(state.valid_till_timestamp)}`);
     }
   }
 
@@ -285,9 +289,14 @@ function freeServerByBot(state, channelId) {
     state.ownerDM = undefined;
     writeServerState(state);
 
-    rtm.sendMessage(`${state._serverName} released by bot\n${lastOwner} lost ownership`, channelId);
+    let destroyMsg = '';
+    if (state._config.dynamic_bootstrap) {
+      const destroyTime = Math.round(state._config.unclaim_to_destroy_time/1000/60);
+      destroyMsg = `\nwill be destroyed after ${destroyTime} minutes of idle`;
+    }
+    rtm.sendMessage(`${state._serverName} released by bot\n${lastOwner} lost ownership${destroyMsg}`, channelId);
     if (lastOwnerDM) {
-      rtm.sendMessage(`${state._serverName} released by bot`, lastOwnerDM);
+      rtm.sendMessage(`${state._serverName} released by bot${destroyMsg}`, lastOwnerDM);
     }
   }
 }
