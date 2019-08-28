@@ -142,7 +142,7 @@ rtm.on('message', async (message) => {
         listServers(context); break;
       case 'help':
         printHelp(context); break;
-      default: throw new Error('unknown command');
+      default: throw new Error('unknown command, try \'help\'');
     }
   } catch (err) {
     console.error(err, err.stack);
