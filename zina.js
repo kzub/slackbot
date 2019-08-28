@@ -146,7 +146,7 @@ rtm.on('message', async (message) => {
     }
   } catch (err) {
     console.error(err, err.stack);
-    const result = typeof (err) === 'string' ? err : 'Internal error';
+    const result = err.message || 'Internal error';
     context.sendMessage(`${slackuser} ${result}`);
   }
 });
@@ -468,7 +468,7 @@ async function parseMessage(message) {
   const parts = text.split(' ');
 
   return {
-    cmd: parts[1],
+    cmd: parts[1].toLowerCase(),
     params: parts.slice(2),
   };
 }
