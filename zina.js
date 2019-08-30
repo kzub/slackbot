@@ -204,6 +204,10 @@ function unClaimServer(context) {
   if (lastOwner) {
     result += `\n${lastOwner} lost ownership`;
   }
+  if (state._config.dynamic_bootstrap) {
+    const destroyTime = Math.round(state._config.unclaim_to_destroy_time/1000/60);
+    result = `\nwill be destroyed after ${destroyTime} minutes of idle`;
+  }
   context.sendMessage(result);
 }
 
