@@ -141,8 +141,8 @@ rtm.on('message', async (message) => {
       case 'list':
         listServers(context); break;
       case 'help':
-        printHelp(context); break;
-      default: throw new Error('unknown command, try \'help\'');
+      default:
+        printHelp(context);
     }
   } catch (err) {
     console.error(err, err.stack);
@@ -441,9 +441,14 @@ function writeServerState(state) {
 //-----------------------------------------------------------
 async function parseMessage(message) {
   let text = message.text;
+  let user = message.user;
 
   if (!text) {
     return null;
+  }
+
+  if (user) {
+    user = await getSlackUser(message.user);
   }
 
   if (message.channel.startsWith('D')) { // direct message
@@ -454,6 +459,7 @@ async function parseMessage(message) {
     return {
       cmd: parts[0],
       params: parts.slice(1),
+      user,
     };
   }
 
@@ -474,6 +480,7 @@ async function parseMessage(message) {
   return {
     cmd: parts[1].toLowerCase(),
     params: parts.slice(2),
+    user,
   };
 }
 
