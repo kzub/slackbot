@@ -29,7 +29,7 @@ app.post('/webhook', (req, res) => {
 
   if (!serverName) {
     console.log('ERROR: bad webhook format, no serverName field');
-    res.status(400).end('bad webhook format');
+    res.status(400).end({ error: 'bad webhook format'});
     return;
   }
 
@@ -41,13 +41,13 @@ app.post('/webhook', (req, res) => {
     case 'inprogress':
       if (!text) {
         console.log('ERROR: bad webhook format, no text field when inprogress');
-        res.status(400).end('bad webhook format');
+        res.status(400).end({ error: 'bad webhook format'});
         return;
       }
-      notifyServerOwner(serverName, `Jenkins: ${serverName} ${action} look for logs here: ${text}`); break;
+      notifyServerOwner(serverName, `Jenkins: ${serverName} ${action} ${text}`); break;
     default:
       console.log('ERROR: bad webhook format, undefined status');
-      res.status(400).end('bad webhook format');
+      res.status(400).end({ error: 'bad webhook format'});
       return;
   }
 
