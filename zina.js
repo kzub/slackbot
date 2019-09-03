@@ -24,27 +24,33 @@ app.listen(port, host, () => {
 // Webhook. Принимает результат создания новой виртуалки и отправляет владельцу в чат
 // Формат: { "serverName": "beta-00", "action": "bootstrap", "result": "ok" }
 app.post('/webhook', (req, res) => {
-  const { serverName, action, result, text } = req.body;
+  const { serverName, action, status, text } = req.body;
   console.log('/webhook', req.body);
 
   if (!serverName) {
-    console.log('ERROR: bad webhook format');
+    console.log('ERROR: bad webhook format, no serverName field');
     res.status(400).end('bad webhook format');
     return;
   }
 
-  if (result == 'ok') {
-    notifyServerOwner(serverName, `Jenkins: ${serverName} ${action} ok`);
-  } else if (result == 'inprogress') {
-    if (!text) {
-      console.log('ERROR: bad webhook format');
+  switch (status) {
+    case 'ok':
+      notifyServerOwner(serverName, `Jenkins: ${serverName} ${action} ok`); break;
+    case 'fail':
+      notifyServerOwner(serverName, `Jenkins: ${serverName} ${action} error!\nCall for help -> #ops-duty`); break;
+    case 'inprogress':
+      if (!text) {
+        console.log('ERROR: bad webhook format, no text field when inprogress');
+        res.status(400).end('bad webhook format');
+        return;
+      }
+      notifyServerOwner(serverName, `Jenkins: ${serverName} ${action} look for logs here: ${text}`); break;
+    default:
+      console.log('ERROR: bad webhook format, undefined status');
       res.status(400).end('bad webhook format');
       return;
-    }
-    notifyServerOwner(serverName, `Jenkins: ${serverName} ${action} look for logs here: ${text}`);
-  } else {
-    notifyServerOwner(serverName, `Jenkins: ${serverName} ${action} error!\nCall for help -> #ops-duty`);
   }
+
   res.json({ ok: true });
 });
 
