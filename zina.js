@@ -24,7 +24,7 @@ app.listen(port, host, () => {
 // Webhook. Принимает результат создания новой виртуалки и отправляет владельцу в чат
 // Формат: { "serverName": "beta-00", "action": "bootstrap", "result": "ok" }
 app.post('/webhook', (req, res) => {
-  const { serverName, action, result } = req.body;
+  const { serverName, action, result, text } = req.body;
   console.log('/webhook', req.body);
 
   if (!serverName) {
@@ -35,6 +35,13 @@ app.post('/webhook', (req, res) => {
 
   if (result == 'ok') {
     notifyServerOwner(serverName, `Jenkins: ${serverName} ${action} ok`);
+  } else if (result == 'inprogress') {
+    if (!text) {
+      console.log('ERROR: bad webhook format');
+      res.status(400).end('bad webhook format');
+      return;
+    }
+    notifyServerOwner(serverName, `Jenkins: ${serverName} ${action} look for logs here: ${text}`);
   } else {
     notifyServerOwner(serverName, `Jenkins: ${serverName} ${action} error!\nCall for help -> #ops-duty`);
   }
@@ -96,7 +103,7 @@ async function getSlackUser(userId) {
 //-----------------------------------------------------------
 async function getDirectMsgChannel(userId) {
   const res = await rtm.webClient.im.open({ user: userId });
-  
+
   if (!res.ok) {
     return;
   }
@@ -261,7 +268,7 @@ function checkServersLoop() {
       console.log('checkServersLoop: channel id not set');
       return;
     }
-    
+
     const currentTime = Date.now();
     const states = readAllServersState();
 
@@ -410,7 +417,7 @@ function readServerState(serverName) {
       console.log('ERROR readServerState() state', stateFileName, err);
     }
   }
-  
+
   return state;
 }
 
@@ -499,7 +506,7 @@ function getClaimTimeRight(config) {
 
     return dayEnd.valueOf();
   }
- 
+
   // в конфиге задано количество времени (милисекунд) отведенных на владение
   if (isFinite(config.claim_time)) {
     return Date.now() + config.claim_time;
