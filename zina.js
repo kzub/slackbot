@@ -29,7 +29,7 @@ app.post('/webhook', (req, res) => {
 
   if (!serverName) {
     console.log('ERROR: bad webhook format, no serverName field');
-    res.status(400).end({ error: 'bad webhook format'});
+    res.status(400).json({ error: 'bad webhook format'});
     return;
   }
 
@@ -41,18 +41,24 @@ app.post('/webhook', (req, res) => {
     case 'inprogress':
       if (!text) {
         console.log('ERROR: bad webhook format, no text field when inprogress');
-        res.status(400).end({ error: 'bad webhook format'});
+        res.status(400).json({ error: 'bad webhook format'});
         return;
       }
       notifyServerOwner(serverName, `Jenkins: ${serverName} ${action} ${text}`); break;
     default:
       console.log('ERROR: bad webhook format, undefined status');
-      res.status(400).end({ error: 'bad webhook format'});
+      res.status(400).json({ error: 'bad webhook format'});
       return;
   }
 
   res.json({ ok: true });
 });
+
+const rtm = new slack.RTMClient(process.env.SLACK_API_TOKEN, {
+  logLevel: slack.LogLevel.INFO
+});
+
+rtm.start();
 
 // ---------------------------------------
 function notifyServerOwner (serverName, message) {
@@ -62,12 +68,6 @@ function notifyServerOwner (serverName, message) {
     rtm.sendMessage(message, toWhom);
   }
 }
-
-const rtm = new slack.RTMClient(process.env.SLACK_API_TOKEN, {
-  logLevel: slack.LogLevel.INFO
-});
-
-rtm.start();
 
 rtm.on('connected', async () => {
   BOT_CHANNEL_ID = await getSlackChannelByName(BOT_CHANNEL);

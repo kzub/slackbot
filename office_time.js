@@ -1,25 +1,82 @@
 /* jshint esnext: true */
 
-const slack = require('@slack/client');
+const async = require('async');
+const bodyParser = require('body-parser');
+const cors = require('cors')
+const express = require('express');
 const fs = require('fs');
 const request = require('request');
+const slack = require('@slack/rtm-api');
 const { spawn } = require('child_process');
-const async = require('async');
 
-const RtmClient = slack.RtmClient;
-const CLIENT_EVENTS = slack.CLIENT_EVENTS;
-const RTM_EVENTS = slack.RTM_EVENTS;
-const MemoryDataStore = slack.MemoryDataStore;
-const token = process.env.SLACK_API_TOKEN;
-const token2 = process.env.SLACK_API_TOKEN_LEGACY;
 const configName = process.env.OFFICEBOT_CONFIG;
 const KT_HOST = process.env.KT_HOST;
 const skudBinary = process.env.SKUDAPP;
 
 if (!KT_HOST) {
   console.log('No KT_HOST');
-  return;
+  process.exit();
 }
+
+let config = JSON.parse(fs.readFileSync(configName));
+
+// --------------------------------------------------------------------------------
+// api gateway for bo monitor
+// --------------------------------------------------------------------------------
+const app = express();
+const { host, port } = process.env;
+if (!host || !port) {
+  console.log('No host/port');
+  process.exit();
+}
+app.use(bodyParser.json());
+app.use(cors());
+app.listen(port, host, () => {
+  console.log(`Listening on port ${host}:${port}!`);
+});
+
+function isGoodDate(date) {
+  return !isNaN(new Date(date).valueOf());
+}
+
+app.post('/timeoffs', (req, res) => {
+  console.log('request: /timeoffs', req.ip, req.body);
+  let { startDate, endDate } = req.body;
+
+  if (!isGoodDate(startDate) || !isGoodDate(endDate)) {
+    console.log('ERROR: bad date format');
+    res.status(400).json({ error: 'bad date format'});
+    return;
+  }
+
+  keepteamTimeOffs({
+    startDate, 
+    endDate,
+  }, function (err, data) {
+    // console.log(err, data)
+    const response = data.map(e => {
+      return {
+        name: [e.Employee.FirstName,e.Employee.LastName].join(' '),
+        startDate: e.StartDate,
+        endDate:e.EndDate,
+        type: e.Type.Name
+      }
+    });
+
+    response.sort((a, b) => {
+      if (a.name == b.name) { return 0;}
+      return a.name > b.name ? 1 : -1;
+    });
+    
+    res.json(response);
+  })
+});
+
+app.get('/*', (req, res) => {
+  console.log('request:', req.url, req.ip);
+  res.json({ ok: true });
+});
+// --------------------------------------------------------------------------------
 
 const keepteamHeaders = {
   'Content-Type': 'application/json; charset=utf-8',
@@ -29,25 +86,53 @@ const keepteamHeaders = {
 };
 
 //---------------------------------- SLACK BOT -----------------------------
-const rtm = new RtmClient(token, {
-  logLevel: 'error', // check this out for more on logger: https://github.com/winstonjs/winston
-  dataStore: new MemoryDataStore(), // pass a new MemoryDataStore instance to cache information
+const rtm = new slack.RTMClient(process.env.SLACK_API_TOKEN, {
+  logLevel: slack.LogLevel.INFO
 });
 
 rtm.start();
-rtm.on(CLIENT_EVENTS.RTM.AUTHENTICATED, () => {
+rtm.on('connected', () => {
   console.log('RTM client authenticated!', new Date());
 });
 
-const channelsMap = {};
-let config = JSON.parse(fs.readFileSync(configName));
+// -----------------------------------------------------------
+async function getSlackUser(userId) {
+  const res = await rtm.webClient.users.info({ user: userId });
+  if (!res.ok) {
+    return null;
+  }
+  return res.user.name;
+}
+// -----------------------------------------------------------
+async function getSlackUserByName(name) {
+  let oneMoreStep = true;
+  let members = [];
 
-rtm.on(RTM_EVENTS.MESSAGE, (message) => {
+  for (let res ; oneMoreStep == true;) {
+    res = await rtm.webClient.users.list({
+      // limit: 500,
+      cursor:  res && res.response_metadata.next_cursor
+    });
+    if (!res.ok) {
+      return null;
+    }
+    members = members.concat(res.members);
+    // console.log(res.members.length, res.response_metadata.next_cursor, oneMoreStep)
+    oneMoreStep = res.response_metadata.next_cursor && res.response_metadata.next_cursor.length > 0;
+  }
+
+  // console.log(`TOTAL USERS: ${members.length}`);
+  const user = members.filter(m => m.name == name).pop();
+  return user && user.id;
+}
+
+// -----------------------------------------------------------
+rtm.on('message', async (message) => {
   try {
     if (!message.user || !message.text) {
       return;
     }
-    const slackuser = getSlackUser(message.user);
+    const slackuser = await getSlackUser(message.user);
     if (!slackuser) {
       console.log('error getting slackuser', message);
       return;
@@ -61,7 +146,7 @@ rtm.on(RTM_EVENTS.MESSAGE, (message) => {
       return;
     }
 
-    if (config.admins[slackuser] && processAdminMessage(message.text, message.channel)) {
+    if (config.admins[slackuser] && (await processAdminMessage(message.text, message.channel))) {
       return;
     }
 
@@ -77,7 +162,7 @@ rtm.on(RTM_EVENTS.MESSAGE, (message) => {
   }
 });
 
-
+// -----------------------------------------------------------
 function processUserMessage(message, msgChannelId) {
   async.parallel([
     (cb) => {
@@ -134,6 +219,7 @@ function processUserMessage(message, msgChannelId) {
   });
 }
 
+// -----------------------------------------------------------
 function insertKTFutureDates(kt, lastDate, response){
   let last = new Date(lastDate + 'T00:00:00Z');
   let dates = Object.keys(kt).filter(d => {
@@ -146,14 +232,14 @@ function insertKTFutureDates(kt, lastDate, response){
   });
 }
 
-
-function processAdminMessage(message, msgChannelId) {
+// -----------------------------------------------------------
+async function processAdminMessage(message, msgChannelId) {
   const parts = message.split(' ');
   const cmd = parts[0];
   const name = parts[1];
 
   if (cmd === 'add') {
-    let user = rtm.dataStore.getUserByName(name);
+    let user = await getSlackUserByName(name);
     if (!user) {
       rtm.sendMessage(`failed. unknown user ${name}`, msgChannelId);
       return true;
@@ -170,12 +256,12 @@ function processAdminMessage(message, msgChannelId) {
     for (let user in config.users) {
       msg.push(user);
     }
-    rtm.sendMessage(msg.join('\n'), msgChannelId);
+    rtm.sendMessage(msg.join('\n') || 'empty', msgChannelId);
     return true;
   }
 
   if (cmd === 'del') {
-    const user = rtm.dataStore.getUserByName(name);
+    const user = getSlackUserByName(name);
     if (!user) {
       rtm.sendMessage(`failed. unknown user ${name}`, msgChannelId);
       return true;
@@ -189,30 +275,17 @@ function processAdminMessage(message, msgChannelId) {
   return false;
 }
 
-function getSlackUser(user) {
-  const userobj = rtm.dataStore.getUserById(user);
-  if (!userobj) {
-    return;
-  }
-  return userobj.name;
-}
-
-function getSlackChannel(channelId) {
-  const chanobj = rtm.dataStore.getChannelById(channelId);
-  if (!chanobj) {
-    return;
-  }
-  return chanobj.name;
-}
-
+// -----------------------------------------------------------
 function isMyself(userId) {
   return userId === config.botUserId;
 }
 
+// -----------------------------------------------------------
 function isSlackDirectChannel(channelId) {
   return channelId && channelId[0] === 'D';
 }
 
+// -----------------------------------------------------------
 function sendSlackChannelMsg(msg) {
   if (!msg) {
     return;
@@ -233,12 +306,12 @@ function checkUserAtSkud(username, callback){
     output += data;
   });
 
-  check.on('close', (code) => {
+  check.on('close', (/*code*/) => {
     callback(undefined, output);
   });
 }
 
-
+// -----------------------------------------------------------
 function checkLateUsers(callback) {
   const check = spawn(skudBinary, ['late']);
   let output = '';
@@ -251,7 +324,7 @@ function checkLateUsers(callback) {
     output += data;
   });
 
-  check.on('close', (code) => {
+  check.on('close', (/*code*/) => {
     let res = checkLateUsersData(output);
     if (res && callback) {
       callback(res);
@@ -259,6 +332,7 @@ function checkLateUsers(callback) {
   });
 }
 
+// -----------------------------------------------------------
 function checkLateUsersData(data) {
   if (!data) {
     return;
@@ -307,7 +381,7 @@ function keepteamAuth (callback) {
   };
 
   // console.log(options);
-  request(options, function (error, response, body) {
+  request(options, function (error, response) {
     if (response && response.statusCode == 204) {
       keepteamHeaders.Cookie = response.headers['set-cookie'][0];
       console.log('Session - OK');
@@ -319,6 +393,7 @@ function keepteamAuth (callback) {
   });
 }
 
+// -----------------------------------------------------------
 function keepteamSearchName(name, callback) {
   let options = {
     url: `https://${KT_HOST}/api/employees/suggest`,
@@ -350,14 +425,18 @@ function keepteamSearchName(name, callback) {
   });
 }
 
+// -----------------------------------------------------------
 function checkUserAtKeepteam(name, callback){
   keepteamSearchName(name, (err, user) => {
     if(err){
       callback(err);
       return;
     }
-    // console.log(user);
-    keepteamTimeOffs(user, (err, data) => {
+    if(!user){
+      callback('keepteam::keepteamSearchName::error no_user');
+      return;
+    }
+    keepteamTimeOffs({ userId: user.Id }, (err, data) => {
       if(err){
         callback(err);
         return;
@@ -368,17 +447,18 @@ function checkUserAtKeepteam(name, callback){
   });
 }
 
-function keepteamTimeOffs(user, callback){
-  if(!user){
-    callback('keepteam::TimeOffs::error nouser');
-    return;
+// -----------------------------------------------------------
+function keepteamTimeOffs(params, callback) {
+  const employees = params.userId || '';
+  let dateFilters = '';
+  if (params.startDate && params.endDate) {
+    dateFilters = `"Start": "${params.startDate}", "End": "${params.endDate}"`;
   }
-
   const options = {
     url: `https://${KT_HOST}/api/TimeOffs/List`,
     method: 'POST',
     headers: keepteamHeaders,
-    body: `{"Filter":{"Employees":["${user.Id}"],"IsApproved":[],"Date":{},"Types":[],"Departments":[]},"OrderBy":{"ColumnName":"Date","Descending":true},"Page":{"Number":1,"Size":50}}`
+    body: `{"Filter":{"Employees":[${employees}],"IsApproved":[],"Date":{${dateFilters}},"Types":[],"Departments":[]},"OrderBy":{"ColumnName":"Date","Descending":true},"Page":{"Number":1,"Size":1000}}`
   };
 
   ktrequest(options, (error, response, body) => {
@@ -391,15 +471,16 @@ function keepteamTimeOffs(user, callback){
     let data;
     try {
       data = JSON.parse(body).Result;
-    } catch (e) {
-      console.log('keepteam::TimeOffs::error 2', e, body);
-      callback(e);
+    } catch (err) {
+      console.log('keepteam::TimeOffs::error 2', err, body);
+      callback(err);
       return;
     }
     callback(undefined, data);
   });
 }
 
+// -----------------------------------------------------------
 function ktrequest(opts, callback){
   request(opts, (error, response, body) => {
     if (response.statusCode != 200) {
@@ -412,6 +493,7 @@ function ktrequest(opts, callback){
   });
 }
 
+// -----------------------------------------------------------
 function keepteamGetFeed(callback){
   const today = new Date().toJSON().slice(0, 10);
   const yesterday = new Date(Date.now() - 86400000).toJSON().slice(0, 10);
@@ -422,7 +504,7 @@ function keepteamGetFeed(callback){
     url: `https://${KT_HOST}/api/feed/list`,
     method: 'POST',
     headers: keepteamHeaders,
-    body: `{"Filter":{"Employees":[],"Date":{Start: "${dayStart}", End: "${dayEnd}"},"Departments":[],"EventTypeCategories":[]},"OrderBy":{"ColumnName":null,"Descending":true},"TimezoneOffset":-180,"Page":{"Number":1,"Size":50}}`
+    body: `{"Filter":{"Employees":[],"Date":{Start: "${dayStart}", End: "${dayEnd}"},"Departments":[],"EventTypeCategories":[]},"OrderBy":{"ColumnName":null,"Descending":true},"TimezoneOffset":-180,"Page":{"Number":1,"Size":500}}`
   };
 
   ktrequest(options, (error, response, body) => {
@@ -444,6 +526,7 @@ function keepteamGetFeed(callback){
   });
 }
 
+// -----------------------------------------------------------
 function keepTeamGetFeedNew(callback) {
   keepteamGetFeed((err, data) => {
     let res = []
@@ -465,7 +548,7 @@ function keepTeamGetFeedNew(callback) {
         maxFeedDate = date;
       }
       let employee = [e.Event.Employee.LastName, e.Event.Employee.FirstName, e.Event.Employee.MiddleName].join(' ');
-      let reason = e.Event.Type.Name;
+
       if (e.Comment) {
         res.push(`Заявка на "${e.Comment}", дней: ${e.Event.TimeOff.Days}, ${employee}`);
       }
@@ -493,10 +576,12 @@ setInterval(() => {
   })
 }, config.feedCheckInterval);
 
+// -----------------------------------------------------------
 function formatDate(date){
   return date.toJSON().slice(0,10);
 }
 
+// -----------------------------------------------------------
 function formatTimeOffs(data){
   const detailed = {};
   for (let idx in data) {
@@ -505,6 +590,7 @@ function formatTimeOffs(data){
   return detailed;
 }
 
+// -----------------------------------------------------------
 function extendTimeOffs(elm, target) {
   let date1 = new Date(elm.StartDate);
   let date2 = new Date(elm.EndDate);
