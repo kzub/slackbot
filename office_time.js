@@ -73,7 +73,12 @@ app.post('/timeoffs', (req, res) => {
 });
 
 app.get('/*', (req, res) => {
-  console.log('request:', req.url, req.ip);
+  console.log('get request:', req.url, req.ip);
+  res.json({ ok: true });
+});
+
+app.post('/*', (req, res) => {
+  console.log('post request:', req.url, req.ip);
   res.json({ ok: true });
 });
 // --------------------------------------------------------------------------------
