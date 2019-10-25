@@ -54,6 +54,12 @@ app.post('/webhook', (req, res) => {
   res.json({ ok: true });
 });
 
+const rtm = new slack.RTMClient(process.env.SLACK_API_TOKEN, {
+  logLevel: slack.LogLevel.INFO
+});
+
+rtm.start();
+
 // ---------------------------------------
 function notifyServerOwner (serverName, message) {
   const state = readServerState(serverName);
@@ -62,12 +68,6 @@ function notifyServerOwner (serverName, message) {
     rtm.sendMessage(message, toWhom);
   }
 }
-
-const rtm = new slack.RTMClient(process.env.SLACK_API_TOKEN, {
-  logLevel: slack.LogLevel.INFO
-});
-
-rtm.start();
 
 rtm.on('connected', async () => {
   BOT_CHANNEL_ID = await getSlackChannelByName(BOT_CHANNEL);
