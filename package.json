@@ -4,7 +4,8 @@
   "description": "Master of devsandbox",
   "main": "./index",
   "scripts": {
-    "run": "./start.sh"
+    "run": "./start.sh",
+    "lint": "./node_modules/.bin/eslint  \"**/*.js\" --ignore-pattern node_modules/"
   },
   "author": "Zubkov Konsatntin",
   "license": "MIT",

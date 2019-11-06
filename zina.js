@@ -24,7 +24,7 @@ app.listen(port, host, () => {
 // Webhook. Принимает результат создания новой виртуалки и отправляет владельцу в чат
 // Формат: { "serverName": "beta-00", "action": "bootstrap", "result": "ok" }
 app.post('/webhook', (req, res) => {
-  const { serverName, action, status, text } = req.body;
+  const { serverName, action, status, text = '' } = req.body;
   console.log('/webhook', req.body);
 
   if (!serverName) {
@@ -35,16 +35,11 @@ app.post('/webhook', (req, res) => {
 
   switch (status) {
     case 'ok':
-      notifyServerOwner(serverName, `Jenkins: ${serverName} ${action} ok`); break;
+      notifyServerOwner(serverName, `Jenkins: ${serverName} ${action} ok\n${text}`); break;
     case 'fail':
-      notifyServerOwner(serverName, `Jenkins: ${serverName} ${action} error!\nCall for help -> #ops-duty`); break;
+      notifyServerOwner(serverName, `Jenkins: ${serverName} ${action} error! Call for help -> #ops-duty\n${text}`); break;
     case 'inprogress':
-      if (!text) {
-        console.log('ERROR: bad webhook format, no text field when inprogress');
-        res.status(400).json({ error: 'bad webhook format'});
-        return;
-      }
-      notifyServerOwner(serverName, `Jenkins: ${serverName} ${action} ${text}`); break;
+      notifyServerOwner(serverName, `Jenkins: ${serverName} ${action}\n${text}`); break;
     default:
       console.log('ERROR: bad webhook format, undefined status');
       res.status(400).json({ error: 'bad webhook format'});
@@ -362,7 +357,7 @@ Call for help -> #ops_duty`);
       return;
     }
 
-    context.sendMessage(`Jenkins: ${context.serverName} bootstrap in progress ...`);
+    context.sendMessage(`Jenkins: ${context.serverName} bootstrap triggered ...`);
   });
 }
 
@@ -390,7 +385,7 @@ Call for help -> #ops_duty`);
       console.log('ERROR jenkinsDestroyServer(2)', context.serverName, httpResponse && httpResponse.statusCode, httpResponse && httpResponse.statusMessage, err);
       return;
     }
-    context.sendMessage(`Jenkins: ${context.serverName} destroy in progress ...`);
+    context.sendMessage(`Jenkins: ${context.serverName} destroy triggered ...`);
   });
 }
 
