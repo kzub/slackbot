@@ -18,7 +18,7 @@
     "request": "v2.83.0"
   },
   "devDependencies": {
-    "eslint": "4.13.1",
+    "eslint": "4.19.1",
     "eslint-config-airbnb-base": "12.1.0",
     "eslint-loader": "1.9.0",
     "eslint-plugin-import": "2.8.0",
