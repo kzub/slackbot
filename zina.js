@@ -211,6 +211,7 @@ function unClaimServer(context) {
 
   state.valid_till_timestamp = currentTime;
   state.owner = undefined;
+  state.lastOwner = lastOwner;
   writeServerState(state);
 
   let result = `${context.serverName} is free`;
