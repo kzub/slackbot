@@ -32,8 +32,15 @@ func scanUsers(conn *sql.DB, name string) (res []string) {
 
 func viewUser(conn *sql.DB, userID string) {
 	// [SN EV_DATETIME TA_TYPE USER_ID]
-	rows, _ := conn.Query("select EV_DATETIME, TA_TYPE from TALOG where USER_ID = ? order by EV_DATETIME ASC", userID)
+	var dateFrom = time.Now().AddDate(0, -1, +1).String()[:10]
+	rows, err := conn.Query("select EV_DATETIME, TA_TYPE from TALOG where USER_ID = " + userID + " AND EV_DATETIME > date '" + dateFrom + "' ORDER BY EV_DATETIME ASC")
 	defer rows.Close()
+
+	if err != nil {
+		fmt.Println("viewUser() error:")
+		fmt.Println(err)
+		return
+	}
 
 	days := make(map[string]int64)
 	additionalInfo := make(map[string]string)
