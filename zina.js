@@ -147,6 +147,7 @@ rtm.on('message', async (message) => {
         context.serverName = data.params[0];
         unClaimServer(context); break;
       case 'list':
+        context.listOption = data.params[0];
         listServers(context); break;
       case 'help':
       default:
@@ -244,6 +245,7 @@ function listServers(context) {
     if (!state.valid_till_timestamp || state.valid_till_timestamp <= currentTime) {
       result.push(`${state._serverName}${dynamic} is free`);
     } else {
+      if (context.listOption == 'free') { continue; }
       result.push(`${state._serverName}${dynamic} is owned by ${state.owner} till ${getDateFromTimestamp(state.valid_till_timestamp)}`);
     }
   }
