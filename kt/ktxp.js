@@ -1,6 +1,7 @@
 /* jshint esnext: true */
 
 const fs = require('fs');
+const zlib = require('zlib');
 const request = require('request');
 const async = require('async');
 
@@ -89,6 +90,8 @@ function keepteamGetEmployeeDetails(employee, callback) {
     headers: keepteamHeaders,
   };
 
+  keepteamGetEmployeePhoto(employee);
+
   ktrequest(options, function (error, response, body) {
     if (response && response.statusCode != 200) {
       console.log('keepteam::keepteamGetEmployeeDetails::bad_status', error, response.statusCode);
@@ -100,8 +103,35 @@ function keepteamGetEmployeeDetails(employee, callback) {
       let data = JSON.parse(body);
       callback(undefined, data);
     } catch (e) {
-      console.log('keepteam::SearchName::error 2', e, body);
+      console.log('keepteam::keepteamGetEmployeeDetails::error 2', e, body);
       callback(e);
+    }
+  });
+}
+
+function keepteamGetEmployeePhoto(employee) {
+  if (!employee.PhotoId) {
+    console.log(`--- No photo for ${employee.FirstName} ${employee.LastName}`);
+    return;
+  }
+  // console.log(`Fetching ${employee.FirstName} ${employee.LastName} photo...`);
+
+  let options = {
+    url: `https://${KT_HOST}/api/Photo?uid=${employee.PhotoId}&height=216&width=216`,
+    headers: keepteamHeaders,
+    encoding: null,
+  };
+
+  ktrequest(options, function (error, response, body) {
+    if (response && response.statusCode != 200) {
+      console.log('keepteam::keepteamGetEmployeePhoto::bad_status', error, response.statusCode, options.url);
+      return;
+    }
+
+    try {
+      fs.writeFileSync(`photos/${employee.Id}.jpg`, response.body, { encoding: 'binary' });
+    } catch (e) {
+      console.log('keepteam::keepteamGetEmployeePhoto::error 2', e, body);
     }
   });
 }
