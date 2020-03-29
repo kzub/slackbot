@@ -8,3 +8,6 @@ skud/check.sh
 office_time.conf
 .idea
 package-lock.json
+*.sql3
+*.json
+
