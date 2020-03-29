@@ -1,5 +1,8 @@
 const slack = require('@slack/rtm-api');
 const sqlite3 = require('sqlite3').verbose();
+const bodyParser = require('body-parser');
+const cors = require('cors')
+const express = require('express');
 
 const db = new sqlite3.Database('user_activity.sql3');
 const rtm = new slack.RTMClient(process.env.SLACK_API_TOKEN, { logLevel: slack.LogLevel.INFO });
@@ -9,6 +12,11 @@ let members;
 const log = (...rest) => {
   console.log((new Date()).toJSON().slice(0, 19), ...rest);
 };
+
+if (!process.env.SLACK_API_TOKEN) {
+  log('slack rtm api error: no token');
+  process.exit();
+}
 
 //-----------------------------------------
 db.serialize();
@@ -83,7 +91,7 @@ const subscribe = async () => {
     });
     members[user.id] = user;
   });
-    
+
   await rtm.subscribePresence(users.map(user => user.id));
   log('subscribe: ok');
 }
@@ -145,3 +153,37 @@ async function getSlackUser(userId) { // eslint-disable-line no-unused-vars
   }
   return res.user.name;
 }
+
+
+// Web API -----------------------------------------
+// =================================================
+/*
+const app = express();
+const { host, port } = process.env;
+if (!host || !port) {
+  log('Express error: No host/port specified');
+  process.exit();
+}
+app.use(bodyParser.json());
+app.use(cors());
+app.listen(port, host, () => {
+  log(`Express listening on port ${host}:${port}.`);
+});
+
+//-----------------------------------------
+app.get('/*', (req, res) => {
+  console.log('get request:', req.url, req.ip);
+  res.json({ ok: true });
+});
+
+*/
+
+
+
+
+
+
+
+
+
+
