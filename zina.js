@@ -243,6 +243,9 @@ function listServers(context) {
     if (state._config.dynamic_bootstrap) {
       dynamic = ' (dynamic)';
     }
+    if (state._config.team) {
+      dynamic = `-${state._config.team}` + dynamic;
+    }
     if (!state.valid_till_timestamp || state.valid_till_timestamp <= currentTime) {
       result.push(`${state._serverName}${dynamic} is free`);
     } else {
