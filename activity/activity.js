@@ -56,6 +56,7 @@ let firstTime = true;
 
 async function loadData (from, to, userId) {
   setLoading(true);
+  setLoadPercent(0, 1);
   const svg = d3.select("#screen")
   svg.selectAll(".vLine").remove();
   svg.selectAll(".vCursor").remove();
@@ -69,8 +70,7 @@ async function loadData (from, to, userId) {
   if (!info.length) {
     setLoading(false);
     return
-  }
-  setLoadPercent(0, info.length);
+  }  
   setUsersCount(info.length);
 
   const dataWidth = info[0].activity.length + 1;
