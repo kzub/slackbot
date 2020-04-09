@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Slack Activity</title>
+	<style type="text/css">
+		#statusbar {
+			position: fixed;
+			top: 0;
+			left: 25px;
+			min-width: 100px;
+			max-height: 20px;
+			background: black;
+			color: white;
+			padding: 2px 4px;
+			margin: 54px 0px 0px 2px;
+			display: none;
+			font-family: monospace;
+    	font-size: 14px;
+		}
+		#timescale {
+			background-color: white;
+			position: fixed;
+			top: 30px;
+			left: 0px;
+			margin: 0px 0px 0px 2px;
+			display: none;
+		}
+		#screen {
+			margin: 52px 0px 0px 0px;
+			background: #440154;
+			display: none;
+		}
+		.controls {
+			position: fixed;
+			top: 0px;
+			font-family: monospace;
+			background-color: white;
+			width: 1167px;
+			height: 47px;
+			padding-top: 4px;
+		}
+		.annotate {
+			fill: white;
+			font-family: monospace;
+    	font-size: 14px;
+		}
+		.vCursor {
+			fill: #222;
+			/*opacity: 0.9;*/
+		}
+		.vCursorAxes text {
+			/*stroke: white;*/
+			fill: white;
+		}
+		.vCursorAxes path {
+	    stroke: white;
+	    display: none;
+	  }
+	  .vCursorAxes line {
+	    stroke: white;
+	  }
+	  .vWeekend {
+	  	opacity: 0.6
+	  }
+	</style>
+</head>
+<body>
+	<div class="controls">
+		<label>From</label> <input id="fromDate" type="date" name="from"/>
+		<span style="margin-right: 20px"></span>
+		<label>To</label>   <input id="toDate" type="date" name="to"/>
+		<span id="userId" style="display: none"></span>
+		[<span id="daysCount"></span> days, <span id="usersCount"></span> lines]
+
+		<button id="btnLoad" style="margin-left: 10px; width: 60px; height: 21px">Load</button>
+		<div id="loadingImg" style="display: none; margin-left: 10px;">
+			<img  src="loading.gif" style="width:20px; height:20px; vertical-align: top;"/>
+			<span id="loadPercent">0%</span>
+		</div>
+
+	</div>
+	<div id="statusbar">test</div>
+	<svg id="timescale"></svg>
+	<svg id="screen"></svg>
+
+	<script type="text/javascript" src="d3.v5.min.js"></script>
+	<script type="text/javascript" src="activity.js"></script>
+</body>
+</html>
