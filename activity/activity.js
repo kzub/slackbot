@@ -70,6 +70,7 @@ async function loadData (from, to, userId) {
     setLoading(false);
     return
   }
+  setLoadPercent(0, info.length);
   setUsersCount(info.length);
 
   const dataWidth = info[0].activity.length + 1;
