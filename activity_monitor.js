@@ -450,8 +450,6 @@ const reSubscribeOnDayStart = () => { // eslint-disable-line no-unused-vars
   // log("!!!!! MONITORING DISABLED !!!!")
   rtm.start();
   setInterval(reSubscribeOnDayStart, MON_INTERVAL);
-  setInterval(transformLog, DB_UPDATE_INTERVAL);
-
   log('network...');
   const { host, port } = process.env;
   if (!host || !port) {
@@ -461,6 +459,9 @@ const reSubscribeOnDayStart = () => { // eslint-disable-line no-unused-vars
   app.listen(port, host, () => {
     log(`Express listening on port ${host}:${port}`);
   });
+  log('update database...');
+  setInterval(transformLog, DB_UPDATE_INTERVAL);
+  transformLog();
 })();
 
 
