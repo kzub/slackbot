@@ -303,10 +303,8 @@ const transformDate = async ({date}, lastDate) => {
     try {
       await sql.run(`BEGIN`);
 
-      if (lastDate) {
-        log('transformDate delete today stats', date, userId);
-        await sql.run(`DELETE FROM stats WHERE userId = '${userId}' AND date = '${date}'`);
-      }
+      log('transformDate delete today stats', date, userId);
+      await sql.run(`DELETE FROM stats WHERE userId = '${userId}' AND date = '${date}'`);
 
       log('transformDate write new stats', date, userId);
       const insertQuery = `INSERT INTO stats (userId,date,${getStatColumns().join()}) VALUES ('${userId}','${date}',${resultActivity.join()})`;
