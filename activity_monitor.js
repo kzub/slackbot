@@ -45,7 +45,12 @@ const getMonitoringIntervalNum = (ts) => {
 }
 
 const log = (...rest) => {
-  console.log(getDateAndTime(getCurrentTimestamp()), ...rest);
+  console.log(getDateAndTime(getCurrentTimestamp()), '[INFO]', ...rest);
+};
+
+const logError = (...rest) => {
+  console.log(getDateAndTime(getCurrentTimestamp()), '[ERROR]', ...rest);
+  // notification....
 };
 
 // ============================================================================================================
@@ -60,7 +65,7 @@ const promiseSQL = (cmd, query, ...rest) => {
   return new global.Promise(function (fulfill, reject){
     db[cmd](query, ...rest, function (err, res){
       if (err) {
-        log(`Error: SQL-RESULT: ${err} ${JSON.stringify(res, null, 2)} ${this}`);
+        logError(`SQL-RESULT: ${err} ${JSON.stringify(res, null, 2)} ${this}`);
         reject(err);
       }
       else fulfill({
@@ -290,7 +295,7 @@ const transformDate = async ({date}, lastDate) => {
     const dayActivity = transformRawActivity(dayData);
 
     if (dayActivity.length !== 1) {
-      log(`Error: transformDate to many results for one date ${date}, ${JSON.stringify(dayActivity)}`);
+      logError(`transformDate to many results for one date ${date}, ${JSON.stringify(dayActivity)}`);
       return;
     }
     const resultActivity = dayActivity[0].activity;
@@ -308,7 +313,7 @@ const transformDate = async ({date}, lastDate) => {
       const queryResult = await sql.run(insertQuery);
       if (queryResult.changes !== 1) {
         await sql.run(`ROLLBACK`);
-        log(`Error: transformDate incorrect results for stat insert ${insertQuery}`);
+        logError(`transformDate incorrect results for stat insert ${insertQuery}`);
         return;
       }
 
@@ -318,14 +323,14 @@ const transformDate = async ({date}, lastDate) => {
         const delQueryResult = await sql.run(deleteQuery);
         if (!delQueryResult.changes) {
           await sql.run(`ROLLBACK`);
-          log(`Error: transformDate incorrect results for activity delete: ${deleteQuery}`);
+          logError(`transformDate incorrect results for activity delete: ${deleteQuery}`);
           return;
         }
       }
       await sql.run(`COMMIT`);
     }
     catch (err) {
-      log(`Error: transformDate unexpected: ${err}`);
+      logError(`transformDate unexpected: ${err}`);
       await sql.run(`ROLLBACK`);
     }
   }
@@ -336,13 +341,18 @@ const transformDate = async ({date}, lastDate) => {
 //-----------------------------------------
 const transformLog = async () => {  // eslint-disable-line no-unused-vars
   log(`transformLog BEGIN`);
-  const dates = await sql.all(`SELECT DISTINCT strftime('%Y-%m-%d', datetime(ts, 'unixepoch')) date FROM activity ORDER BY date ASC`);
-  for (const id in dates) {
-    const res = await transformDate(dates[id], (Number(id)== dates.length - 1));
-    if (!res) {
-      log(`Error: transformLog stop processing`);
-      return;
+  try {
+    const dates = await sql.all(`SELECT DISTINCT strftime('%Y-%m-%d', datetime(ts, 'unixepoch')) date FROM activity ORDER BY date ASC`);
+    for (const id in dates) {
+      const res = await transformDate(dates[id], (Number(id)== dates.length - 1));
+      if (!res) {
+        logError(`transformLog stop processing`);
+        return;
+      }
     }
+  }
+  catch (err) {
+    logError(`transformLog unexpected: ${err}`);
   }
   log(`transformLog END`);
 };
@@ -389,12 +399,15 @@ rtm.on('presence_change', async (event) => {
   const { user: userId, presence } = event;
   const user = members[userId];
   if (!user) {
-    log(`Error: presence_change unknown userId ${userId}`);
+    logError(`presence_change unknown userId ${userId}`);
     return;
   }
-
-  await insertActivity({ userId, presence })
-  log(`presence_change ${user.name} (${user.real_name}): ${presence}`);
+  try {
+    await insertActivity({ userId, presence })
+    log(`presence_change ${user.name} (${user.real_name}): ${presence}`);
+  } catch(err) {
+    logError('presence_change unexpected ${err}');
+  }
 });
 
 // ============================================================================================================
@@ -449,7 +462,7 @@ const reSubscribeOnDayStart = () => { // eslint-disable-line no-unused-vars
   await createTables();
   log('slack...');
   if (!process.env.SLACK_API_TOKEN) {
-    log('Error: slack rtm api no token');
+    logError('slack rtm api no token');
     process.exit();
   }
   // log("!!!!! MONITORING DISABLED !!!!")
@@ -458,7 +471,7 @@ const reSubscribeOnDayStart = () => { // eslint-disable-line no-unused-vars
   log('network...');
   const { host, port } = process.env;
   if (!host || !port) {
-    log('Error: Express no host/port specified');
+    logError('Express no host/port specified');
     process.exit();
   }
   app.listen(port, host, () => {
