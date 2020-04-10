@@ -51,8 +51,8 @@ const log = (...rest) => {
 // ============================================================================================================
 // DATABASE API
 // ============================================================================================================
-const db = new sqlite3.Database('user_activity.sql3');
-db.serialize();
+const db = new sqlite3.Database(process.env.DATABASE_FILE);
+// db.serialize();
 
 //-----------------------------------------
 const promiseSQL = (cmd, query, ...rest) => {
@@ -295,34 +295,39 @@ const transformDate = async ({date}, lastDate) => {
     }
     const resultActivity = dayActivity[0].activity;
 
-    await sql.run(`BEGIN`);
+    try {
+      await sql.run(`BEGIN`);
 
-    if (lastDate) {
-      log('transformDate delete today stats', date, userId);
-      await sql.run(`DELETE FROM stats WHERE userId = '${userId}' AND date = '${date}'`);
-    }
+      if (lastDate) {
+        log('transformDate delete today stats', date, userId);
+        await sql.run(`DELETE FROM stats WHERE userId = '${userId}' AND date = '${date}'`);
+      }
 
-    log('transformDate write new stats', date, userId);
-    const insertQuery = `INSERT INTO stats (userId,date,${getStatColumns().join()}) VALUES ('${userId}','${date}',${resultActivity.join()})`;
-    const queryResult = await sql.run(insertQuery);
-    if (queryResult.changes !== 1) {
-      await sql.run(`ROLLBACK`);
-      log(`Error: transformDate incorrect results for stat insert ${insertQuery}`);
-      return;
-    }
-
-    if (!lastDate) {
-      log('transformDate remove processed activity', date, userId);
-      const deleteQuery = `DELETE FROM activity WHERE userId = '${userId}' AND strftime('%Y-%m-%d', datetime(ts, 'unixepoch')) = '${date}'`;
-      const delQueryResult = await sql.run(deleteQuery);
-      if (!delQueryResult.changes) {
+      log('transformDate write new stats', date, userId);
+      const insertQuery = `INSERT INTO stats (userId,date,${getStatColumns().join()}) VALUES ('${userId}','${date}',${resultActivity.join()})`;
+      const queryResult = await sql.run(insertQuery);
+      if (queryResult.changes !== 1) {
         await sql.run(`ROLLBACK`);
-        log(`Error: transformDate incorrect results for activity delete: ${deleteQuery}`);
+        log(`Error: transformDate incorrect results for stat insert ${insertQuery}`);
         return;
       }
-    }
 
-    await sql.run(`COMMIT`);
+      if (!lastDate) {
+        log('transformDate remove processed activity', date, userId);
+        const deleteQuery = `DELETE FROM activity WHERE userId = '${userId}' AND strftime('%Y-%m-%d', datetime(ts, 'unixepoch')) = '${date}'`;
+        const delQueryResult = await sql.run(deleteQuery);
+        if (!delQueryResult.changes) {
+          await sql.run(`ROLLBACK`);
+          log(`Error: transformDate incorrect results for activity delete: ${deleteQuery}`);
+          return;
+        }
+      }
+      await sql.run(`COMMIT`);
+    }
+    catch (err) {
+      log(`Error: transformDate unexpected: ${err}`);
+      await sql.run(`ROLLBACK`);
+    }
   }
 
   return 'ok';
@@ -398,7 +403,7 @@ rtm.on('presence_change', async (event) => {
 const app = express();
 app.use(bodyParser.json());
 app.use(cors());
-app.use(express.static('activity'));
+app.use(express.static(process.env.WEB_ROOT));
 
 //-----------------------------------------
 app.get('/user/:userId/:from/:to/', async (req, res) => {

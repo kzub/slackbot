@@ -63,9 +63,9 @@ async function loadData (from, to, userId) {
 
   let info;
   if (userId) {
-    info = (await d3.json(`/user/${userId}/${from}/${to}/`)).data;
+    info = (await d3.json(`user/${userId}/${from}/${to}/`)).data;
   } else {
-    info = (await d3.json(`/activity/${from}/${to}/`)).data;
+    info = (await d3.json(`activity/${from}/${to}/`)).data;
   }
   if (!info.length) {
     setLoading(false);
