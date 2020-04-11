@@ -62,10 +62,16 @@ async function loadData (from, to, userId) {
   svg.selectAll(".vCursor").remove();
 
   let info;
-  if (userId) {
-    info = (await d3.json(`user/${userId}/${from}/${to}/`)).data;
-  } else {
-    info = (await d3.json(`activity/${from}/${to}/`)).data;
+  try {
+    if (userId) {
+      info = (await d3.json(`user/${userId}/${from}/${to}/`, { redirect: 'manual' })).data;
+    } else {
+      info = (await d3.json(`activity/${from}/${to}/`, { redirect: 'manual' })).data;
+    }
+  } catch (err) {
+    console.error('fetch error', err);
+    document.location.reload(); // in case of redirect on google auth session exired
+    return;
   }
   if (!info.length) {
     setLoading(false);
