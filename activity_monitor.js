@@ -61,7 +61,7 @@ const db = new sqlite3.Database(process.env.DATABASE_FILE);
 
 //-----------------------------------------
 const promiseSQL = (cmd, query, ...rest) => {
-  log(`SQL-BEGIN: ${query}`);
+  // log(`SQL-BEGIN: ${query}`);
   return new global.Promise(function (fulfill, reject){
     db[cmd](query, ...rest, function (err, res){
       if (err) {
@@ -135,7 +135,7 @@ const insertActivity = async ({ presence, userId }) => {
 const insertUser = async ({ userId, userName, userRealName }) => {
   const res = await sql.all(`SELECT * from users WHERE userId = '${userId}'`);
   if (res && res.length > 0) {
-    log(`insertUser: user already exist ${userId}`);
+    // log(`insertUser: user already exist ${userId}`);
     return;
   }
   return sql.run(`INSERT INTO users (userId, userName, userRealName) VALUES ('${userId}', '${userName}', '${userRealName}')`);
@@ -402,7 +402,7 @@ rtm.on('presence_change', async (event) => {
   }
   try {
     await insertActivity({ userId, presence })
-    log(`presence_change ${user.name} (${user.real_name}): ${presence}`);
+    // log(`presence_change ${user.name} (${user.real_name}): ${presence}`);
   } catch(err) {
     logError('presence_change unexpected ${err}');
   }

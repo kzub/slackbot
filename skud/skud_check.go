@@ -12,7 +12,7 @@ import (
 
 func scanUsers(conn *sql.DB, name string) (res []string) {
 	// USER_ID AREA_ID USER_NAME AREA_NAME POSITION DEPT_ID DEPT PHONE MOBILE GROUP
-	rows, err := conn.Query("SELECT USER_ID, USER_NAME FROM V_USERS WHERE USER_NAME LIKE '%" + name + "%'")
+	rows, err := conn.Query("SELECT USER_ID, USER_NAME FROM V_USERS WHERE USER_NAME LIKE '%" + name + "%' OR USER_ID = " + name)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -24,7 +24,7 @@ func scanUsers(conn *sql.DB, name string) (res []string) {
 
 	for rows.Next() {
 		rows.Scan(&userID, &userName)
-		fmt.Println(userName)
+		fmt.Println(userName, userID)
 		res = append(res, userID)
 	}
 	return
