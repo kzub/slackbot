@@ -8,11 +8,19 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"strconv"
 )
 
 func scanUsers(conn *sql.DB, name string) (res []string) {
 	// USER_ID AREA_ID USER_NAME AREA_NAME POSITION DEPT_ID DEPT PHONE MOBILE GROUP
-	rows, err := conn.Query("SELECT USER_ID, USER_NAME FROM V_USERS WHERE USER_NAME LIKE '%" + name + "%' OR USER_ID = " + name)
+	query := ""
+	if _, err := strconv.Atoi(name); err == nil  {
+		query = "SELECT USER_ID, USER_NAME FROM V_USERS WHERE USER_ID = " + name
+	} else {
+		query = "SELECT USER_ID, USER_NAME FROM V_USERS WHERE USER_NAME LIKE '%" + name + "%'"
+	}
+	fmt.Println(query)
+	rows, err := conn.Query(query)
 	if err != nil {
 		fmt.Println(err)
 		return
