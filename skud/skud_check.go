@@ -19,7 +19,7 @@ func scanUsers(conn *sql.DB, name string) (res []string) {
 	} else {
 		query = "SELECT USER_ID, USER_NAME FROM V_USERS WHERE USER_NAME LIKE '%" + name + "%'"
 	}
-	fmt.Println(query)
+	// fmt.Println(query)
 	rows, err := conn.Query(query)
 	if err != nil {
 		fmt.Println(err)
