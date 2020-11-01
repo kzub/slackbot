@@ -10,4 +10,8 @@ office_time.conf
 package-lock.json
 *.sql3
 *.json
+*.sublime-project
+*.sublime-workspace
+skud/src
+.DS_Store
 
