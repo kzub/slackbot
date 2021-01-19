@@ -53,6 +53,16 @@ const logError = (...rest) => {
   // notification....
 };
 
+
+process.on('unhandledRejection', function(reason, p){
+   console.log(getDateAndTime(getCurrentTimestamp()), 'unhandledRejection', reason, p);
+});
+
+process.on('uncaughtException', function(error) {
+       console.log(getDateAndTime(getCurrentTimestamp()), 'uncaughtException', error);
+});
+
+
 // ============================================================================================================
 // DATABASE API
 // ============================================================================================================
@@ -377,8 +387,9 @@ const subscribe = async () => {
     members[user.id] = user;
   });
 
+  log(`userlist to subscribe: ${users.map(user => user.id)}`);
   await rtm.subscribePresence(users.map(user => user.id));
-  log('subscribe: ok');
+  log(`subscribe: ok`);
 }
 
 //-----------------------------------------
@@ -388,14 +399,15 @@ rtm.on('connected', async () => {
 });
 
 //-----------------------------------------
-rtm.on('reconnecting', async () => {
-  log('RTM client RECONNECTING!');
+rtm.on('reconnecting', async (params) => {
+  log(`RTM client RECONNECTING! ${params}`);
 });
 
 //-----------------------------------------
 rtm.on('presence_change', async (event) => {
   const { user: userId, presence } = event;
   const user = members[userId];
+  // log(`presence_change userId ${userId}: ${presence}`);
   if (!user) {
     logError(`presence_change unknown userId ${userId}`);
     return;
