@@ -372,24 +372,29 @@ let members = {};
 const rtm = new slack.RTMClient(process.env.SLACK_API_TOKEN, { logLevel: slack.LogLevel.INFO });
 
 const subscribe = async () => {
-  log(`subscribe: fetching active users for: ${rtm.activeTeamId}`);
-  const usersList = await rtm.webClient.users.list({team_id: rtm.activeTeamId });
-  const users = usersList.members.filter(user => !user.deleted && !user.is_bot && !user.is_restricted);
+  try {
+    log(`subscribe: fetching active users for: ${rtm.activeTeamId}`);
+    const usersList = await rtm.webClient.users.list({team_id: rtm.activeTeamId });
+    const users = usersList.members.filter(user => !user.deleted && !user.is_bot && !user.is_restricted);
 
-  log(`subscribe: found ${users.length} users`);
-  members = {};
-  users.forEach(user => {
-    insertUser({
-      userId: user.id,
-      userName: user.name,
-      userRealName: user.real_name,
+    log(`subscribe: found ${users.length} users`);
+    members = {};
+    users.forEach(user => {
+      insertUser({
+        userId: user.id,
+        userName: user.name,
+        userRealName: user.real_name,
+      });
+      members[user.id] = user;
     });
-    members[user.id] = user;
-  });
 
-  log(`userlist to subscribe: ${users.map(user => user.id)}`);
-  await rtm.subscribePresence(users.map(user => user.id));
-  log(`subscribe: ok`);
+    log(`userlist to subscribe: ${users.map(user => user.id)}`);
+    await rtm.subscribePresence(users.map(user => user.id));
+    log(`subscribe: ok`);
+  } catch (err) {
+    logError(err);
+    process.exit(-1);
+  }
 }
 
 //-----------------------------------------
@@ -476,7 +481,7 @@ const reSubscribeOnDayStart = () => { // eslint-disable-line no-unused-vars
     process.exit();
   }
   // log("!!!!! MONITORING DISABLED !!!!")
-  rtm.start();
+  rtm.start().catch(console.log);
   setInterval(reSubscribeOnDayStart, MON_INTERVAL);
   log('network...');
   const { host, port } = process.env;
