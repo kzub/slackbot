@@ -20,6 +20,15 @@ if (!KT_HOST) {
 
 let config = JSON.parse(fs.readFileSync(configName));
 
+process.on('unhandledRejection', function(reason, p){
+   console.log('unhandledRejection', reason, p);
+});
+
+process.on('uncaughtException', function(error) {
+       console.log('uncaughtException', error);
+});
+
+
 // --------------------------------------------------------------------------------
 // api gateway for bo monitor
 // --------------------------------------------------------------------------------
@@ -50,7 +59,7 @@ app.post('/timeoffs', (req, res) => {
   }
 
   keepteamTimeOffs({
-    startDate, 
+    startDate,
     endDate,
   }, function (err, data) {
     // console.log(err, data)
@@ -67,7 +76,7 @@ app.post('/timeoffs', (req, res) => {
       if (a.name == b.name) { return 0;}
       return a.name > b.name ? 1 : -1;
     });
-    
+
     res.json(response);
   })
 });
