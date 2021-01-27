@@ -25,7 +25,6 @@ const getDate = (ts) => {
   return getDateObj(ts).toJSON().slice(0, 10);
 };
 
-
 // GMT 20 21 22 23 00 01 02 03 04 05 .. 20 21 22 23 00
 // MSK 23 00 01 02 03 04 05 06 07 08 .. 23 00 01 02 03
 
@@ -75,9 +74,27 @@ const promiseSQL = (cmd, query, ...rest) => {
   });
 };
 
+let inTransactionState = false;
+
 const sql = {
-  run: async (...rest) => (await promiseSQL('run', ...rest)).statement,
-  all: async (...rest) => (await promiseSQL('all', ...rest)).result,
+  run: async (...rest) => {
+    if (inTransactionState) {
+      log.error(`Cannot run sql command, while locked state: ${JSON.stringify(rest)}`);
+      return;
+    }
+    return (await promiseSQL('run', ...rest)).statement;
+  },
+  all: async (...rest) => {
+    if (inTransactionState) {
+      log.error(`Cannot run sql command, while locked state: ${JSON.stringify(rest)}`);
+      return;
+    }
+    return (await promiseSQL('all', ...rest)).result;
+  },
+  lock: () => { inTransactionState = true; },
+  unlock: () => { inTransactionState = false; },
+  lockedRun: async (...rest) => (await promiseSQL('run', ...rest)).statement,
+  lockedAll: async (...rest) => (await promiseSQL('all', ...rest)).result,
 };
 
 const getStatColumns = (prefix = '', suffix = '') => {
@@ -283,14 +300,14 @@ const getUsersActivity = async ({ from, to }) => {
 
 //-----------------------------------------
 const transformDate = async ({date}, lastDate) => {
-  const users = await sql.all(`SELECT DISTINCT userId FROM activity WHERE strftime('%Y-%m-%d', datetime(ts, 'unixepoch')) = '${date}'`);
+  const users = await sql.lockedAll(`SELECT DISTINCT userId FROM activity WHERE strftime('%Y-%m-%d', datetime(ts, 'unixepoch')) = '${date}'`);
 
   log.info(`transformDate, ${date}, ${users.length}, ${lastDate}`);
   for (const id in users) {
     const { userId } = users[id];
 
     log.info(`transformDate read activity, ${date}, ${userId}, ${id}, ${Math.floor(100 * id / users.length)}%`);
-    const dayData = await sql.all(`SELECT ts, userPresence FROM activity WHERE userId = '${userId}' AND strftime('%Y-%m-%d', datetime(ts, 'unixepoch')) = '${date}' ORDER BY ts ASC`);
+    const dayData = await sql.lockedAll(`SELECT ts, userPresence FROM activity WHERE userId = '${userId}' AND strftime('%Y-%m-%d', datetime(ts, 'unixepoch')) = '${date}' ORDER BY ts ASC`);
     const dayActivity = transformRawActivity(dayData);
 
     if (dayActivity.length !== 1) {
@@ -300,16 +317,16 @@ const transformDate = async ({date}, lastDate) => {
     const resultActivity = dayActivity[0].activity;
 
     try {
-      await sql.run(`BEGIN`);
+      await sql.lockedRun(`BEGIN`);
 
       log.info(`transformDate delete today stats, ${date}, ${userId}`);
-      await sql.run(`DELETE FROM stats WHERE userId = '${userId}' AND date = '${date}'`);
+      await sql.lockedRun(`DELETE FROM stats WHERE userId = '${userId}' AND date = '${date}'`);
 
       log.info(`transformDate write new stats, ${date}, ${userId}`);
       const insertQuery = `INSERT INTO stats (userId,date,${getStatColumns().join()}) VALUES ('${userId}','${date}',${resultActivity.join()})`;
-      const queryResult = await sql.run(insertQuery);
+      const queryResult = await sql.lockedRun(insertQuery);
       if (queryResult.changes !== 1) {
-        await sql.run(`ROLLBACK`);
+        await sql.lockedRun(`ROLLBACK`);
         log.error(`transformDate incorrect results for stat insert ${insertQuery}`);
         return;
       }
@@ -317,18 +334,18 @@ const transformDate = async ({date}, lastDate) => {
       if (!lastDate) {
         log.info(`transformDate remove processed activity, ${date}, ${userId}`);
         const deleteQuery = `DELETE FROM activity WHERE userId = '${userId}' AND strftime('%Y-%m-%d', datetime(ts, 'unixepoch')) = '${date}'`;
-        const delQueryResult = await sql.run(deleteQuery);
+        const delQueryResult = await sql.lockedRun(deleteQuery);
         if (!delQueryResult.changes) {
-          await sql.run(`ROLLBACK`);
+          await sql.lockedRun(`ROLLBACK`);
           log.error(`transformDate incorrect results for activity delete: ${deleteQuery}`);
           return;
         }
       }
-      await sql.run(`COMMIT`);
+      await sql.lockedRun(`COMMIT`);
     }
     catch (err) {
       log.error(`transformDate unexpected: ${err}`);
-      await sql.run(`ROLLBACK`);
+      await sql.lockedRun(`ROLLBACK`);
     }
   }
 
@@ -338,8 +355,9 @@ const transformDate = async ({date}, lastDate) => {
 //-----------------------------------------
 const transformLog = async () => {  // eslint-disable-line no-unused-vars
   log.info(`transformLog BEGIN`);
+  sql.lock();
   try {
-    const dates = await sql.all(`SELECT DISTINCT strftime('%Y-%m-%d', datetime(ts, 'unixepoch')) date FROM activity ORDER BY date ASC`);
+    const dates = await sql.lockedAll(`SELECT DISTINCT strftime('%Y-%m-%d', datetime(ts, 'unixepoch')) date FROM activity ORDER BY date ASC`);
     for (const id in dates) {
       const res = await transformDate(dates[id], (Number(id)== dates.length - 1));
       if (!res) {
@@ -351,6 +369,7 @@ const transformLog = async () => {  // eslint-disable-line no-unused-vars
   catch (err) {
     log.error(`transformLog unexpected: ${err}`);
   }
+  sql.unlock();
   log.info(`transformLog END`);
 };
 
@@ -401,9 +420,10 @@ rtm.on('reconnecting', async () => {
 rtm.on('presence_change', async (event) => {
   const { user: userId, presence } = event;
   const user = members[userId];
+
   log.info(`presence_change userId ${userId}: ${presence}`);
   if (!user) {
-    log.error(`presence_change unknown userId ${userId}`);
+    log.error(`presence_change unknown userId: ${userId}, ${JSON.stringify(event)}`);
     return;
   }
   try {
