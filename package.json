@@ -17,7 +17,9 @@
     "cors": "^2.8.5",
     "express": "^4.17.1",
     "request": "v2.83.0",
-    "sqlite3": "^4.1.1"
+    "sqlite3": "^4.1.1",
+    "winston": "^3.3.3",
+    "winston-daily-rotate-file": "^4.5.0"
   },
   "devDependencies": {
     "eslint": "4.19.1",

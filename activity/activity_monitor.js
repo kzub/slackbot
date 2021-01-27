@@ -3,8 +3,9 @@ const sqlite3 = require('sqlite3').verbose();
 const bodyParser = require('body-parser');
 const cors = require('cors')
 const express = require('express');
-const tests = require('./activity/activity_mon_test');
+const tests = require('./activity_mon_test');
 const sleep = (ms) => new global.Promise((fulfill) => setTimeout(fulfill, ms)); // eslint-disable-line no-unused-vars
+const log = require('./logger').create();
 
 //-----------------------------------------
 const TIMEZONE_OFFSET = 3*60*60*1000; // Moscow time
@@ -24,9 +25,6 @@ const getDate = (ts) => {
   return getDateObj(ts).toJSON().slice(0, 10);
 };
 
-const getDateAndTime = (ts) => {
-  return getDateObj(ts).toJSON().slice(0, 19);
-};
 
 // GMT 20 21 22 23 00 01 02 03 04 05 .. 20 21 22 23 00
 // MSK 23 00 01 02 03 04 05 06 07 08 .. 23 00 01 02 03
@@ -44,22 +42,13 @@ const getMonitoringIntervalNum = (ts) => {
   return intervalNum;
 }
 
-const log = (...rest) => {
-  console.log(getDateAndTime(getCurrentTimestamp()), '[INFO]', ...rest);
-};
-
-const logError = (...rest) => {
-  console.log(getDateAndTime(getCurrentTimestamp()), '[ERROR]', ...rest);
-  // notification....
-};
-
 
 process.on('unhandledRejection', function(reason, p){
-   console.log(getDateAndTime(getCurrentTimestamp()), 'unhandledRejection', reason, p);
+   log.error(`unhandledRejection, ${reason}, ${p}`);
 });
 
 process.on('uncaughtException', function(error) {
-       console.log(getDateAndTime(getCurrentTimestamp()), 'uncaughtException', error);
+   log.error(`uncaughtException, ${error}`);
 });
 
 
@@ -71,11 +60,11 @@ const db = new sqlite3.Database(process.env.DATABASE_FILE);
 
 //-----------------------------------------
 const promiseSQL = (cmd, query, ...rest) => {
-  // log(`SQL-BEGIN: ${query}`);
+  // log.info(`SQL-BEGIN: ${query}`);
   return new global.Promise(function (fulfill, reject){
     db[cmd](query, ...rest, function (err, res){
       if (err) {
-        logError(`SQL-RESULT: ${err} ${JSON.stringify(res, null, 2)} ${this}`);
+        log.error(`SQL-RESULT: ${err} ${JSON.stringify(res, null, 2)} ${this}`);
         reject(err);
       }
       else fulfill({
@@ -101,7 +90,7 @@ const getStatColumns = (prefix = '', suffix = '') => {
 
 const createTables = async () => {
   // userId, userName, userRealName
-  log('check table users...');
+  log.info('check table users...');
   await sql.run(`CREATE TABLE IF NOT EXISTS users (
     userId TEXT PRIMARY KEY NOT NULL,
     userName TEXT,
@@ -110,7 +99,7 @@ const createTables = async () => {
   await sql.run(`CREATE UNIQUE INDEX IF NOT EXISTS userId ON users (userId)`);
 
   // ts, userId, userPresence
-  log('check table activity...');
+  log.info('check table activity...');
   await sql.run(`CREATE TABLE IF NOT EXISTS activity (
     ts INTEGER NOT NULL,
     userId TEXT NOT NULL,
@@ -118,14 +107,14 @@ const createTables = async () => {
   )`);
 
   // userId, date, c0,c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,c11,c12,...........,c286,c287;
-  log('check table stats...')
+  log.info('check table stats...')
   await sql.run(`CREATE TABLE IF NOT EXISTS stats (
     userId TEXT NOT NULL,
     date text NOT NULL,
     ${getStatColumns('', ' INTEGER NOT NULL').join()}
   )`);
 
-  log('check table stats index...');
+  log.info('check table stats index...');
   await sql.run(`CREATE UNIQUE INDEX IF NOT EXISTS userdate ON stats (userId, date)`);
 };
 
@@ -145,7 +134,7 @@ const insertActivity = async ({ presence, userId }) => {
 const insertUser = async ({ userId, userName, userRealName }) => {
   const res = await sql.all(`SELECT * from users WHERE userId = '${userId}'`);
   if (res && res.length > 0) {
-    // log(`insertUser: user already exist ${userId}`);
+    // log.info(`insertUser: user already exist ${userId}`);
     return;
   }
   return sql.run(`INSERT INTO users (userId, userName, userRealName) VALUES ('${userId}', '${userName}', '${userRealName}')`);
@@ -165,7 +154,7 @@ const transformRawActivity = (allData) => {
   const currentTs = getCurrentTimestamp();
   const currentDate = getDate(currentTs);
   const currentIntervalNum = getMonitoringIntervalNum(currentTs/1000);
-  // console.log(currentTs, currentDate, currentIntervalNum);
+  // log.info(currentTs, currentDate, currentIntervalNum);
 
   for (let date of Object.keys(map)) {
     const dateRows = map[date];
@@ -179,10 +168,10 @@ const transformRawActivity = (allData) => {
     for (let i = 0; i < MON_INTERVAL_COUNT; i++) {
       let found = false;
 
-      // console.log('-', date, i, currentRow, dateRows.length, dateRows[currentRow] && dateRows[currentRow].ts, dateRows[currentRow] && dateRows[currentRow].userPresence, intervalLastState, currentRow < dateRows.length ? getMonitoringIntervalNum(dateRows[currentRow].ts) : '-');
+      // log.info('-', date, i, currentRow, dateRows.length, dateRows[currentRow] && dateRows[currentRow].ts, dateRows[currentRow] && dateRows[currentRow].userPresence, intervalLastState, currentRow < dateRows.length ? getMonitoringIntervalNum(dateRows[currentRow].ts) : '-');
       while ((currentRow < dateRows.length) && getMonitoringIntervalNum(dateRows[currentRow].ts) === i) {
         intervalLastState = dateRows[currentRow].userPresence; // save state for future intervals
-        // console.log('W', date, i, currentRow, dateRows.length, dateRows[currentRow].ts, dateRows[currentRow].userPresence, intervalLastState, getMonitoringIntervalNum(dateRows[currentRow].ts));
+        // log.info('W', date, i, currentRow, dateRows.length, dateRows[currentRow].ts, dateRows[currentRow].userPresence, intervalLastState, getMonitoringIntervalNum(dateRows[currentRow].ts));
         if (intervalLastState > 0) {
           row.activity[i] = intervalLastState;
           found = true;
@@ -201,7 +190,7 @@ const transformRawActivity = (allData) => {
     }
 
     result.push(row);
-    // console.log(date, row.activity.length, row.activity.join(''));
+    // log.info(date, row.activity.length, row.activity.join(''));
   }
 
   return result;
@@ -296,16 +285,16 @@ const getUsersActivity = async ({ from, to }) => {
 const transformDate = async ({date}, lastDate) => {
   const users = await sql.all(`SELECT DISTINCT userId FROM activity WHERE strftime('%Y-%m-%d', datetime(ts, 'unixepoch')) = '${date}'`);
 
-  log('transformDate', date, users.length, lastDate);
+  log.info('transformDate', date, users.length, lastDate);
   for (const id in users) {
     const { userId } = users[id];
 
-    log('transformDate read activity', date, userId, id, `${Math.floor(100 * id / users.length)}%`);
+    log.info('transformDate read activity', date, userId, id, `${Math.floor(100 * id / users.length)}%`);
     const dayData = await sql.all(`SELECT ts, userPresence FROM activity WHERE userId = '${userId}' AND strftime('%Y-%m-%d', datetime(ts, 'unixepoch')) = '${date}' ORDER BY ts ASC`);
     const dayActivity = transformRawActivity(dayData);
 
     if (dayActivity.length !== 1) {
-      logError(`transformDate to many results for one date ${date}, ${JSON.stringify(dayActivity)}`);
+      log.error(`transformDate to many results for one date ${date}, ${JSON.stringify(dayActivity)}`);
       return;
     }
     const resultActivity = dayActivity[0].activity;
@@ -313,32 +302,32 @@ const transformDate = async ({date}, lastDate) => {
     try {
       await sql.run(`BEGIN`);
 
-      log('transformDate delete today stats', date, userId);
+      log.info('transformDate delete today stats', date, userId);
       await sql.run(`DELETE FROM stats WHERE userId = '${userId}' AND date = '${date}'`);
 
-      log('transformDate write new stats', date, userId);
+      log.info('transformDate write new stats', date, userId);
       const insertQuery = `INSERT INTO stats (userId,date,${getStatColumns().join()}) VALUES ('${userId}','${date}',${resultActivity.join()})`;
       const queryResult = await sql.run(insertQuery);
       if (queryResult.changes !== 1) {
         await sql.run(`ROLLBACK`);
-        logError(`transformDate incorrect results for stat insert ${insertQuery}`);
+        log.error(`transformDate incorrect results for stat insert ${insertQuery}`);
         return;
       }
 
       if (!lastDate) {
-        log('transformDate remove processed activity', date, userId);
+        log.info('transformDate remove processed activity', date, userId);
         const deleteQuery = `DELETE FROM activity WHERE userId = '${userId}' AND strftime('%Y-%m-%d', datetime(ts, 'unixepoch')) = '${date}'`;
         const delQueryResult = await sql.run(deleteQuery);
         if (!delQueryResult.changes) {
           await sql.run(`ROLLBACK`);
-          logError(`transformDate incorrect results for activity delete: ${deleteQuery}`);
+          log.error(`transformDate incorrect results for activity delete: ${deleteQuery}`);
           return;
         }
       }
       await sql.run(`COMMIT`);
     }
     catch (err) {
-      logError(`transformDate unexpected: ${err}`);
+      log.error(`transformDate unexpected: ${err}`);
       await sql.run(`ROLLBACK`);
     }
   }
@@ -348,21 +337,21 @@ const transformDate = async ({date}, lastDate) => {
 
 //-----------------------------------------
 const transformLog = async () => {  // eslint-disable-line no-unused-vars
-  log(`transformLog BEGIN`);
+  log.info(`transformLog BEGIN`);
   try {
     const dates = await sql.all(`SELECT DISTINCT strftime('%Y-%m-%d', datetime(ts, 'unixepoch')) date FROM activity ORDER BY date ASC`);
     for (const id in dates) {
       const res = await transformDate(dates[id], (Number(id)== dates.length - 1));
       if (!res) {
-        logError(`transformLog stop processing`);
+        log.error(`transformLog stop processing`);
         return;
       }
     }
   }
   catch (err) {
-    logError(`transformLog unexpected: ${err}`);
+    log.error(`transformLog unexpected: ${err}`);
   }
-  log(`transformLog END`);
+  log.info(`transformLog END`);
 };
 
 // ============================================================================================================
@@ -373,11 +362,11 @@ const rtm = new slack.RTMClient(process.env.SLACK_API_TOKEN, { logLevel: slack.L
 
 const subscribe = async () => {
   try {
-    log(`subscribe: fetching active users for: ${rtm.activeTeamId}`);
+    log.info(`subscribe: fetching active users for: ${rtm.activeTeamId}`);
     const usersList = await rtm.webClient.users.list({team_id: rtm.activeTeamId });
     const users = usersList.members.filter(user => !user.deleted && !user.is_bot && !user.is_restricted);
 
-    log(`subscribe: found ${users.length} users`);
+    log.info(`subscribe: found ${users.length} users`);
     members = {};
     users.forEach(user => {
       insertUser({
@@ -388,40 +377,40 @@ const subscribe = async () => {
       members[user.id] = user;
     });
 
-    log(`userlist to subscribe: ${users.map(user => user.id)}`);
+    log.info(`userlist to subscribe: ${users.map(user => user.id)}`);
     await rtm.subscribePresence(users.map(user => user.id));
-    log(`subscribe: ok`);
+    log.info(`subscribe: ok`);
   } catch (err) {
-    logError(err);
+    log.error(err);
     process.exit(-1);
   }
 }
 
 //-----------------------------------------
 rtm.on('connected', async () => {
-  log(`RTM client connected! userId: ${rtm.activeUserId}, teamId: ${rtm.activeTeamId}`);
+  log.info(`RTM client connected! userId: ${rtm.activeUserId}, teamId: ${rtm.activeTeamId}`);
   subscribe();
 });
 
 //-----------------------------------------
 rtm.on('reconnecting', async (params) => {
-  log(`RTM client RECONNECTING! ${params}`);
+  log.info(`RTM client RECONNECTING! ${params}`);
 });
 
 //-----------------------------------------
 rtm.on('presence_change', async (event) => {
   const { user: userId, presence } = event;
   const user = members[userId];
-  // log(`presence_change userId ${userId}: ${presence}`);
+  log.info(`presence_change userId ${userId}: ${presence}`);
   if (!user) {
-    logError(`presence_change unknown userId ${userId}`);
+    log.error(`presence_change unknown userId ${userId}`);
     return;
   }
   try {
     await insertActivity({ userId, presence })
-    // log(`presence_change ${user.name} (${user.real_name}): ${presence}`);
+    // log.info(`presence_change ${user.name} (${user.real_name}): ${presence}`);
   } catch(err) {
-    logError('presence_change unexpected ${err}');
+    log.error('presence_change unexpected ${err}');
   }
 });
 
@@ -435,7 +424,7 @@ app.use(express.static(process.env.WEB_ROOT));
 
 //-----------------------------------------
 app.get('/user/:userId/:from/:to/', async (req, res) => {
-  log('HTTP', req.url, req.ip, req.params);
+  log.info('HTTP', req.url, req.ip, req.params);
   const { userId, from, to } = req.params;
   const data = await getUserActivity({ from, to, userId });
   res.json({ ok: true, userId, data });
@@ -443,7 +432,7 @@ app.get('/user/:userId/:from/:to/', async (req, res) => {
 
 //-----------------------------------------
 app.get('/activity/:from/:to', async (req, res) => {
-  log('HTTP', req.url, req.ip, req.params);
+  log.info('HTTP', req.url, req.ip, req.params);
   const { from, to } = req.params;
   const data = await getUsersActivity({ from, to });
   res.json({ ok: true, data });
@@ -451,11 +440,11 @@ app.get('/activity/:from/:to', async (req, res) => {
 
 //-----------------------------------------
 app.get('/*', (req, res) => {
-  log('HTTP unknown get request:', req.url, req.ip);
+  log.info('HTTP unknown get request:', req.url, req.ip);
   res.json({ ok: true });
 });
 app.post('/*', (req, res) => {
-  log('HTTP unknown post request:', req.url, req.ip);
+  log.info('HTTP unknown post request:', req.url, req.ip);
   res.json({ ok: true });
 });
 
@@ -471,28 +460,30 @@ const reSubscribeOnDayStart = () => { // eslint-disable-line no-unused-vars
 
 //-----------------------------------------
 (async function init () {
-  log('tests...');
+  log.info('tests...');
   tests.run({ transformRawActivity, getMonitoringIntervalNum });
-  log('tables...');
+  log.info('tables...');
   await createTables();
-  log('slack...');
+  log.info('slack...');
   if (!process.env.SLACK_API_TOKEN) {
-    logError('slack rtm api no token');
+    log.error('slack rtm api no token');
     process.exit();
   }
-  // log("!!!!! MONITORING DISABLED !!!!")
-  rtm.start().catch(console.log);
+  // log.info("!!!!! MONITORING DISABLED !!!!")
+  rtm.start().catch((err) => {
+    log.error(err);
+  });
   setInterval(reSubscribeOnDayStart, MON_INTERVAL);
-  log('network...');
+  log.info('network...');
   const { host, port } = process.env;
   if (!host || !port) {
-    logError('Express no host/port specified');
+    log.error('Express no host/port specified');
     process.exit();
   }
   app.listen(port, host, () => {
-    log(`Express listening on port ${host}:${port}`);
+    log.info(`Express listening on port ${host}:${port}`);
   });
-  log('update database...');
+  log.info('update database...');
   setInterval(transformLog, DB_UPDATE_INTERVAL);
   transformLog();
 })();
