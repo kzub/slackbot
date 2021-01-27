@@ -393,8 +393,8 @@ rtm.on('connected', async () => {
 });
 
 //-----------------------------------------
-rtm.on('reconnecting', async (params) => {
-  log.info(`RTM client RECONNECTING! ${params}`);
+rtm.on('reconnecting', async () => {
+  log.warn(`RTM client RECONNECTING!`);
 });
 
 //-----------------------------------------
@@ -424,7 +424,7 @@ app.use(express.static(process.env.WEB_ROOT));
 
 //-----------------------------------------
 app.get('/user/:userId/:from/:to/', async (req, res) => {
-  log.info(`HTTP, ${req.url}, ${req.ip}, ${req.params}`);
+  log.info(`HTTP: ${req.url}, ${req.ip}, ${JSON.stringify(req.params)}`);
   const { userId, from, to } = req.params;
   const data = await getUserActivity({ from, to, userId });
   res.json({ ok: true, userId, data });
@@ -432,7 +432,7 @@ app.get('/user/:userId/:from/:to/', async (req, res) => {
 
 //-----------------------------------------
 app.get('/activity/:from/:to', async (req, res) => {
-  log.info(`HTTP, ${req.url}, ${req.ip}, ${req.params}`);
+  log.info(`HTTP, ${req.url}, ${req.ip}, ${JSON.stringify(req.params)}`);
   const { from, to } = req.params;
   const data = await getUsersActivity({ from, to });
   res.json({ ok: true, data });
