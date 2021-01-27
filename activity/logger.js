@@ -34,7 +34,7 @@ const jsonFormat = (name) => format.combine(
 let logTransport;
 if (logFilePath) {
   logTransport = new (winston.transports.DailyRotateFile)({
-    filename: `${logFilePath}slackbot_activity_%DATE%.log`,
+    filename: `${logFilePath}slackbot.activity.%DATE%.log`,
     datePattern: 'YYYY-MM-DD',
     zippedArchive: true,
     maxSize: '20m',
