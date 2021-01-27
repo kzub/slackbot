@@ -4,6 +4,7 @@ const { format } = require('logform');
 require('winston-daily-rotate-file');
 
 const logFilePath = process.env.LOGFILEPATH;
+const logJSON = process.env.LOGJSON;
 
 const consoleFormat = (name) => format.combine(
   format.colorize(),
@@ -33,7 +34,7 @@ const jsonFormat = (name) => format.combine(
 let logTransport;
 if (logFilePath) {
   logTransport = new (winston.transports.DailyRotateFile)({
-    filename: `${logFilePath}slack_activity_%DATE%.log`,
+    filename: `${logFilePath}slackbot_activity_%DATE%.log`,
     datePattern: 'YYYY-MM-DD',
     zippedArchive: true,
     maxSize: '20m',
@@ -44,10 +45,10 @@ if (logFilePath) {
 }
 
 
-const create = (name = '') => {
+const create = (name) => {
   let format;
 
-  if (logFilePath) {
+  if (logJSON) {
     format = jsonFormat(name);
   } else {
     format = consoleFormat(name);
