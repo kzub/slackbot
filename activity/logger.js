@@ -6,28 +6,25 @@ require('winston-daily-rotate-file');
 const logFilePath = process.env.LOGFILEPATH;
 const logJSON = process.env.LOGJSON;
 
-const consoleFormat = (name) => format.combine(
+const consoleFormat = () => format.combine(
   format.colorize(),
   format.timestamp(),
   format.printf(info => {
     if (typeof info.message === 'object') {
       info.message = JSON.stringify(info.message, undefined, 2);
     }
-    return `${info.timestamp} ${name} [${info.level}]: ${info.message}`;
+    return `${info.timestamp} [${info.level}]: ${info.message}`;
   })
 );
 
-const jsonFormat = (name) => format.combine(
+const jsonFormat = () => format.combine(
   format.timestamp(),
   format.printf(info => {
     if (typeof info.message === 'object') {
       info.data = JSON.stringify(info.message, undefined, 2);
       delete info.message;
     }
-    return JSON.stringify({
-      name: name,
-      ...info,
-    });
+    return JSON.stringify(info);
   }),
 );
 
@@ -45,13 +42,13 @@ if (logFilePath) {
 }
 
 
-const create = (name) => {
+const create = () => {
   let format;
 
   if (logJSON) {
-    format = jsonFormat(name);
+    format = jsonFormat();
   } else {
-    format = consoleFormat(name);
+    format = consoleFormat();
   }
 
   const logger = winston.createLogger({

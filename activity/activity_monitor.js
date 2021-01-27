@@ -154,7 +154,7 @@ const transformRawActivity = (allData) => {
   const currentTs = getCurrentTimestamp();
   const currentDate = getDate(currentTs);
   const currentIntervalNum = getMonitoringIntervalNum(currentTs/1000);
-  // log.info(currentTs, currentDate, currentIntervalNum);
+  log.info(`${currentTs}, ${currentDate}, ${currentIntervalNum}`);
 
   for (let date of Object.keys(map)) {
     const dateRows = map[date];
@@ -168,10 +168,10 @@ const transformRawActivity = (allData) => {
     for (let i = 0; i < MON_INTERVAL_COUNT; i++) {
       let found = false;
 
-      // log.info('-', date, i, currentRow, dateRows.length, dateRows[currentRow] && dateRows[currentRow].ts, dateRows[currentRow] && dateRows[currentRow].userPresence, intervalLastState, currentRow < dateRows.length ? getMonitoringIntervalNum(dateRows[currentRow].ts) : '-');
+      // log.info(`-, ${date}, ${i}, ${currentRow}, ${dateRows.length}, ${dateRows[currentRow] && dateRows[currentRow].ts}, ${dateRows[currentRow] && dateRows[currentRow].userPresence}, ${intervalLastState}, ${currentRow < dateRows.length ? getMonitoringIntervalNum(dateRows[currentRow].ts) : '-'}`);
       while ((currentRow < dateRows.length) && getMonitoringIntervalNum(dateRows[currentRow].ts) === i) {
         intervalLastState = dateRows[currentRow].userPresence; // save state for future intervals
-        // log.info('W', date, i, currentRow, dateRows.length, dateRows[currentRow].ts, dateRows[currentRow].userPresence, intervalLastState, getMonitoringIntervalNum(dateRows[currentRow].ts));
+        // log.info(`W, ${date}, ${i}, ${currentRow}, ${dateRows.length}, ${dateRows[currentRow].ts}, ${dateRows[currentRow].userPresence}, ${intervalLastState}, ${getMonitoringIntervalNum(dateRows[currentRow].ts)}`);
         if (intervalLastState > 0) {
           row.activity[i] = intervalLastState;
           found = true;
@@ -190,7 +190,7 @@ const transformRawActivity = (allData) => {
     }
 
     result.push(row);
-    // log.info(date, row.activity.length, row.activity.join(''));
+    // log.info(`${date}, ${row.activity.length}, ${row.activity.join('')}`);
   }
 
   return result;
@@ -285,11 +285,11 @@ const getUsersActivity = async ({ from, to }) => {
 const transformDate = async ({date}, lastDate) => {
   const users = await sql.all(`SELECT DISTINCT userId FROM activity WHERE strftime('%Y-%m-%d', datetime(ts, 'unixepoch')) = '${date}'`);
 
-  log.info('transformDate', date, users.length, lastDate);
+  log.info(`transformDate, ${date}, ${users.length}, ${lastDate}`);
   for (const id in users) {
     const { userId } = users[id];
 
-    log.info('transformDate read activity', date, userId, id, `${Math.floor(100 * id / users.length)}%`);
+    log.info(`transformDate read activity, ${date}, ${userId}, ${id}, ${Math.floor(100 * id / users.length)}%`);
     const dayData = await sql.all(`SELECT ts, userPresence FROM activity WHERE userId = '${userId}' AND strftime('%Y-%m-%d', datetime(ts, 'unixepoch')) = '${date}' ORDER BY ts ASC`);
     const dayActivity = transformRawActivity(dayData);
 
@@ -302,10 +302,10 @@ const transformDate = async ({date}, lastDate) => {
     try {
       await sql.run(`BEGIN`);
 
-      log.info('transformDate delete today stats', date, userId);
+      log.info(`transformDate delete today stats, ${date}, ${userId}`);
       await sql.run(`DELETE FROM stats WHERE userId = '${userId}' AND date = '${date}'`);
 
-      log.info('transformDate write new stats', date, userId);
+      log.info(`transformDate write new stats, ${date}, ${userId}`);
       const insertQuery = `INSERT INTO stats (userId,date,${getStatColumns().join()}) VALUES ('${userId}','${date}',${resultActivity.join()})`;
       const queryResult = await sql.run(insertQuery);
       if (queryResult.changes !== 1) {
@@ -315,7 +315,7 @@ const transformDate = async ({date}, lastDate) => {
       }
 
       if (!lastDate) {
-        log.info('transformDate remove processed activity', date, userId);
+        log.info(`transformDate remove processed activity, ${date}, ${userId}`);
         const deleteQuery = `DELETE FROM activity WHERE userId = '${userId}' AND strftime('%Y-%m-%d', datetime(ts, 'unixepoch')) = '${date}'`;
         const delQueryResult = await sql.run(deleteQuery);
         if (!delQueryResult.changes) {
@@ -381,7 +381,7 @@ const subscribe = async () => {
     await rtm.subscribePresence(users.map(user => user.id));
     log.info(`subscribe: ok`);
   } catch (err) {
-    log.error(err);
+    log.error(`subscribe error: ${err}`);
     process.exit(-1);
   }
 }
@@ -410,7 +410,7 @@ rtm.on('presence_change', async (event) => {
     await insertActivity({ userId, presence })
     // log.info(`presence_change ${user.name} (${user.real_name}): ${presence}`);
   } catch(err) {
-    log.error('presence_change unexpected ${err}');
+    log.error(`presence_change unexpected ${err}`);
   }
 });
 
@@ -424,7 +424,7 @@ app.use(express.static(process.env.WEB_ROOT));
 
 //-----------------------------------------
 app.get('/user/:userId/:from/:to/', async (req, res) => {
-  log.info('HTTP', req.url, req.ip, req.params);
+  log.info(`HTTP, ${req.url}, ${req.ip}, ${req.params}`);
   const { userId, from, to } = req.params;
   const data = await getUserActivity({ from, to, userId });
   res.json({ ok: true, userId, data });
@@ -432,7 +432,7 @@ app.get('/user/:userId/:from/:to/', async (req, res) => {
 
 //-----------------------------------------
 app.get('/activity/:from/:to', async (req, res) => {
-  log.info('HTTP', req.url, req.ip, req.params);
+  log.info(`HTTP, ${req.url}, ${req.ip}, ${req.params}`);
   const { from, to } = req.params;
   const data = await getUsersActivity({ from, to });
   res.json({ ok: true, data });
@@ -440,11 +440,11 @@ app.get('/activity/:from/:to', async (req, res) => {
 
 //-----------------------------------------
 app.get('/*', (req, res) => {
-  log.info('HTTP unknown get request:', req.url, req.ip);
+  log.info(`HTTP unknown get request:, ${req.url}, ${req.ip}`);
   res.json({ ok: true });
 });
 app.post('/*', (req, res) => {
-  log.info('HTTP unknown post request:', req.url, req.ip);
+  log.info(`HTTP unknown post request:, ${req.url}, ${req.ip}`);
   res.json({ ok: true });
 });
 
@@ -471,7 +471,7 @@ const reSubscribeOnDayStart = () => { // eslint-disable-line no-unused-vars
   }
   // log.info("!!!!! MONITORING DISABLED !!!!")
   rtm.start().catch((err) => {
-    log.error(err);
+    log.error(`rtm.start error: ${err}`);
   });
   setInterval(reSubscribeOnDayStart, MON_INTERVAL);
   log.info('network...');
