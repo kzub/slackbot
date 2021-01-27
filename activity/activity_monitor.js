@@ -78,16 +78,14 @@ let inTransactionState = false;
 
 const sql = {
   run: async (...rest) => {
-    if (inTransactionState) {
-      log.error(`Cannot run sql command, while locked state: ${JSON.stringify(rest)}`);
-      return;
+    while (inTransactionState) {
+      await sleep(100);
     }
     return (await promiseSQL('run', ...rest)).statement;
   },
   all: async (...rest) => {
-    if (inTransactionState) {
-      log.error(`Cannot run sql command, while locked state: ${JSON.stringify(rest)}`);
-      return;
+    while (inTransactionState) {
+      await sleep(100);
     }
     return (await promiseSQL('all', ...rest)).result;
   },
@@ -377,7 +375,20 @@ const transformLog = async () => {  // eslint-disable-line no-unused-vars
 // SLACK API
 // ============================================================================================================
 let members = {};
-const rtm = new slack.RTMClient(process.env.SLACK_API_TOKEN, { logLevel: slack.LogLevel.INFO });
+const rtm = new slack.RTMClient(process.env.SLACK_API_TOKEN, {
+  // logLevel: slack.LogLevel.DEBUG,
+  logLevel: slack.LogLevel.INFO,
+  logger: {
+    debug: (...msgs) => { log.debug(`RTM: ${JSON.stringify(msgs)}`); },
+    info: (...msgs) => { log.info(`RTM: ${JSON.stringify(msgs)}`); },
+    warn: (...msgs) => { log.warn(`RTM: ${JSON.stringify(msgs)}`); },
+    error: (...msgs) => { log.error(`RTM: ${JSON.stringify(msgs)}`); },
+    setLevel: () => { },
+    setName:  () => { },
+  },
+  clientPingTimeout: 120000,
+  serverPongTimeout: 60000,
+});
 
 const subscribe = async () => {
   try {
@@ -414,6 +425,23 @@ rtm.on('connected', async () => {
 //-----------------------------------------
 rtm.on('reconnecting', async () => {
   log.warn(`RTM client RECONNECTING!`);
+});
+
+
+//-----------------------------------------
+rtm.on('error', async (error) => {
+  log.error(`RTM client error: ${JSON.stringify(error)}`);
+});
+
+// rtm.on('slack_event', async (event, params) => {
+//   if (event == 'presence_change') {
+//     return;
+//   }
+//   log.info(`RTM event: ${event}, ${JSON.stringify(params)}`);
+// });
+
+rtm.on('unable_to_rtm_start', async (error) => {
+  log.error(`RTM start error: ${JSON.stringify(error)}`);
 });
 
 //-----------------------------------------
