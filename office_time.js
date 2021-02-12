@@ -337,7 +337,7 @@ function checkUserAtSkud(username, callback){
 
 // -----------------------------------------------------------
 function checkLateUsers(callback) {
-  const check = spawn(skudBinary, ['late']);
+  const check = spawn(skudBinary, ['arrived']); // не опоздавшие, а просто по мере прихода
   let output = '';
 
   check.stdout.on('data', (data) => {
