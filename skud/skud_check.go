@@ -180,12 +180,19 @@ func lateUsers(conn *sql.DB) (res []string) {
 	today := time.Now().String()[:10]
 	timeX, _ := time.Parse(time.RFC3339, today+"T11:30:00Z")
 
+	var usersSorted []string ;
 	for u, k := range users {
 		firstEnter := k[0]
 		t, _ := time.Parse(time.RFC3339, firstEnter)
 		if t.After(timeX) {
-			fmt.Println(firstEnter + "|" + u)
+			usersSorted = append(usersSorted, firstEnter + "|" + u)
 		}
+	}
+
+	sort.Strings(usersSorted)
+
+	for _, txt := range usersSorted {
+		fmt.Println(txt)
 	}
 	return
 }
@@ -214,9 +221,15 @@ func arrivedUsers(conn *sql.DB) (res []string) {
 		users[userName] = append(users[userName], date)
 	}
 
+	var usersSorted []string ;
 	for u, k := range users {
 		firstEnter := k[0]
-		fmt.Println(firstEnter + "|" + u)
+		usersSorted = append(usersSorted, firstEnter + "|" + u)
+	}
+	sort.Strings(usersSorted)
+
+	for _, txt := range usersSorted {
+		fmt.Println(txt)
 	}
 	return
 }
