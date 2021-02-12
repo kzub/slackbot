@@ -103,7 +103,7 @@ const keepteamHeaders = {
 const rtm = new slack.RTMClient(process.env.SLACK_API_TOKEN, {
   logLevel: slack.LogLevel.INFO,
   logger: {
-    debug: (...msgs) => { console.log(`RTM[DEBUG]: ${JSON.stringify(msgs)}`); },
+    debug: (...msgs) => { /*console.log(`RTM[DEBUG]: ${JSON.stringify(msgs)}`); */},
     info: (...msgs) =>  { console.log(`RTM[INFO]: ${JSON.stringify(msgs)}`);  },
     warn: (...msgs) =>  { console.log(`RTM[WARN]: ${JSON.stringify(msgs)}`);  },
     error: (...msgs) => { console.log(`RTM[ERROR]: ${JSON.stringify(msgs)}`); },
