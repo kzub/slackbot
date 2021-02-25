@@ -27,6 +27,13 @@ async function getSlackUser(userId) {
   return res.user.name;
 }
 
+process.on('unhandledRejection', function(reason, p){
+   console.log('unhandledRejection', reason, p);
+});
+
+process.on('uncaughtException', function(error) {
+       console.log('uncaughtException', error);
+});
 
 //-----------------------------------------------------------
 async function getSlackUserByName(name) {
@@ -56,17 +63,18 @@ async function getSlackChannelByName(name) {
   let oneMoreStep = true;
   let channels = [];
   for (let res ; oneMoreStep == true;) {
-    res = await rtm.webClient.channels.list({
+    res = await rtm.webClient.conversations.list({
       exclude_archived: true,
       // limit: 500,
       cursor:  res && res.response_metadata.next_cursor
     });
+
     if (!res.ok) {
       return null;
     }
     channels = channels.concat(res.channels);
     // console.log(res.channels.length, res.response_metadata.next_cursor, oneMoreStep)
-    oneMoreStep = res.response_metadata.next_cursor && res.response_metadata.next_cursor > 0;
+    oneMoreStep = res.response_metadata.next_cursor && res.response_metadata.next_cursor.length > 0;
   }
 
   // console.log(`TOTAL CHANNELS: ${channels.length}`);
