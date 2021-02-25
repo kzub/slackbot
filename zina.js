@@ -20,6 +20,13 @@ app.listen(port, host, () => {
   console.log(`Zina listening on port ${host}:${port}!`);
 });
 
+process.on('unhandledRejection', function(reason, p){
+   console.log('unhandledRejection', reason, p);
+});
+
+process.on('uncaughtException', function(error) {
+       console.log('uncaughtException', error);
+});
 
 // Webhook. Принимает результат создания новой виртуалки и отправляет владельцу в чат
 // Формат: { "serverName": "beta-00", "action": "bootstrap", "result": "ok" }
@@ -104,7 +111,7 @@ async function getSlackUser(userId) {
 
 //-----------------------------------------------------------
 async function getDirectMsgChannel(userId) {
-  const res = await rtm.webClient.im.open({ user: userId });
+  const res = await rtm.webClient.conversations.open({ users: userId });
 
   if (!res.ok) {
     return;
