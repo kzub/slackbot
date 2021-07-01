@@ -12,6 +12,7 @@
   "repository": "",
   "dependencies": {
     "@slack/rtm-api": "^5.0.5",
+    "@slack/web-api": "^6.2.4",
     "async": "2.6.0",
     "body-parser": "^1.19.0",
     "cors": "^2.8.5",

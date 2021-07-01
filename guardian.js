@@ -1,16 +1,34 @@
 const slack = require('@slack/rtm-api');
+const { WebClient } = require('@slack/web-api');
 const fs = require('fs');
-const request = require('request');
 
-const token = process.env.SLACK_API_TOKEN;
-const token2 = process.env.SLACK_API_TOKEN_LEGACY;
 const configName = 'guardian.conf';
 
-const rtm = new slack.RTMClient(token, {
-  logLevel: slack.LogLevel.INFO
+const rtm = new slack.RTMClient(process.env.SLACK_API_TOKEN, {
+  logger: {
+    debug: (...msgs) => { /*console.log(`RTM[DEBUG]: ${JSON.stringify(msgs)}`);*/ },
+    info: (...msgs) =>  { console.log(`RTM[INFO]: ${JSON.stringify(msgs)}`);  },
+    warn: (...msgs) =>  { console.log(`RTM[WARN]: ${JSON.stringify(msgs)}`);  },
+    error: (...msgs) => { console.log(`RTM[ERROR]: ${JSON.stringify(msgs)}`); },
+    setLevel: () => { },
+    setName:  () => { },
+  },
+  clientPingTimeout: 120000,
+  serverPongTimeout: 60000,
 });
 
 rtm.start();
+
+const web = new WebClient(process.env.SLACK_WEBAPI_TOKEN, {
+  logger: {
+    debug: (...msgs) => { /*console.log(`RTM[DEBUG]: ${JSON.stringify(msgs)}`);*/ },
+    info: (...msgs) =>  { console.log(`RTM[INFO]: ${JSON.stringify(msgs)}`);  },
+    warn: (...msgs) =>  { console.log(`RTM[WARN]: ${JSON.stringify(msgs)}`);  },
+    error: (...msgs) => { console.log(`RTM[ERROR]: ${JSON.stringify(msgs)}`); },
+    setLevel: () => { },
+    setName:  () => { },
+  },
+});
 
 rtm.on('connected', () => {
   console.log('RTM client authenticated!', new Date());
@@ -28,11 +46,11 @@ async function getSlackUser(userId) {
 }
 
 process.on('unhandledRejection', function(reason, p){
-   console.log('unhandledRejection', reason, p);
+  console.log('unhandledRejection', reason, p);
 });
 
 process.on('uncaughtException', function(error) {
-       console.log('uncaughtException', error);
+  console.log('uncaughtException', error);
 });
 
 //-----------------------------------------------------------
@@ -175,7 +193,7 @@ rtm.on('message', async (message) => {
         await processAdminMessage(message.text, message.channel);
         return;
       }
-      console.log('error getting channel', message);
+      console.log('error getting channel', slackuser, message);
       return;
     }
     console.log(channel, slackuser, `thread:${Boolean(message.thread_ts)}`, message.text);
@@ -184,17 +202,15 @@ rtm.on('message', async (message) => {
       return;
     }
 
-    console.log('DELETE MESSAGE ^^^');
-    let url =  `https://slack.com/api/chat.delete?token=${token2}`;
-    url += `&ts=${message.ts}`;
-    url += `&channel=${message.channel}`;
-    url += '&as_user=true&pretty=1';
+    console.log(`DELETE MESSAGE ^^^, ${message.ts}, ${message.channel}`);
 
-    request(url, (err) => {
-      if (err) {
-        console.log(err);
-      }
-    });
+    await web.chat.delete({
+      ts: message.ts,
+      channel: message.channel,
+    }).catch(err => {
+      console.log('ERROR DELETE MESSAGE:', err.data);
+    })
+
   } catch (err) {
     console.error(err, err.stack);
   }
