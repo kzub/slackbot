@@ -58,6 +58,8 @@ app.post('/webhook', (req, res) => {
 
 const rtm = new slack.RTMClient(process.env.SLACK_API_TOKEN, {
   logLevel: slack.LogLevel.INFO
+  clientPingTimeout: 120000,
+  serverPongTimeout: 60000,
 });
 
 rtm.start();
