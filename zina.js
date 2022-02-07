@@ -108,7 +108,7 @@ async function getSlackUser(userId) {
   if (!res.ok) {
     return null;
   }
-  return res.user.name;
+  return res.user.profile.display_name;
 }
 
 //-----------------------------------------------------------
