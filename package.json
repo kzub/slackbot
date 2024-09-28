@@ -13,7 +13,7 @@
   "dependencies": {
     "@slack/rtm-api": "^6.0.0",
     "@slack/web-api": "^6.7.2",
-    "async": "2.6.0",
+    "async": "2.6.4",
     "body-parser": "^1.19.0",
     "cors": "^2.8.5",
     "express": "^4.17.1",
