@@ -19,8 +19,10 @@
     "express": "^4.17.1",
     "request": "v2.83.0",
     "sqlite3": "^4.1.1",
+    "websocket": "^1.0.35",
     "winston": "^3.3.3",
-    "winston-daily-rotate-file": "^4.5.0"
+    "winston-daily-rotate-file": "^4.5.0",
+    "ws": "^8.18.0"
   },
   "devDependencies": {
     "eslint": "4.19.1",
