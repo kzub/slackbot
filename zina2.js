@@ -173,6 +173,7 @@ function listServers(context) {
 //-----------------------------------------------------------
 function printHelp(context) {
     context.sendMessage(`list
+list free
 get <server>
 free <server>`);
 }
