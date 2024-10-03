@@ -7,6 +7,7 @@ const INFO_DIR = 'info';
 const DEFAULT_CLIAM_TIME = 1000 * 60 * 60 * 24;
 const CHECK_SERVERS_STATUS_INTERVAL = 1000 * 10;
 const BOT_CHANNEL_ID = process.env.BOT_CHANNEL_ID
+const TSQ = "```";
 
 let BOT_ID;
 
@@ -81,7 +82,7 @@ function claimServer(context) {
     const currentTime = Date.now();
     if (state.valid_till_timestamp && context.loopUser !== state.owner) {
         if (currentTime < state.valid_till_timestamp) {
-            context.sendMessage(`ERROR. ${context.serverName} is owned by ${state.owner} till ${getDateFromTimestamp(state.valid_till_timestamp)}`);
+            context.sendMessage(`ERROR. ${context.serverName} is owned by ${state.owner} till ${TSQ}${getDateFromTimestamp(state.valid_till_timestamp)}${TSQ}`);
             return;
         }
     }
@@ -95,7 +96,7 @@ function claimServer(context) {
 
     writeServerState(state);
 
-    let result = `${context.serverName} is yours ${state.owner} till ${getDateFromTimestamp(state.valid_till_timestamp)}`;
+    let result = `${context.serverName} is yours ${state.owner} till ${TSQ}${getDateFromTimestamp(state.valid_till_timestamp)}${TSQ}`;
     if (userchange) {
         result += `\n${lastOwner} lost ownership\n`;
     }
@@ -163,7 +164,7 @@ function listServers(context) {
             result.push(`${state._serverName}${dynamic} is free`);
         } else {
             if (context.listOption == 'free') { continue; }
-            result.push(`${state._serverName}${dynamic} is owned by ${state.owner} till ${getDateFromTimestamp(state.valid_till_timestamp)}`);
+            result.push(`${state._serverName}${dynamic} is owned by ${state.owner} till ${TSQ}${getDateFromTimestamp(state.valid_till_timestamp)}${TSQ}`);
         }
     }
 
