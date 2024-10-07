@@ -44,6 +44,7 @@ function wsConnect(eventHandler) {
     // console.log(wsClient);
     wsClient.on('connectFailed', function (error) {
         console.error('Connect Error: ', error);
+        setTimeout(wsIntConnectCommand, reconnectTime);
     });
 
     wsClient.on('connect', function (connection) {
