@@ -163,7 +163,7 @@ async function getDirectMsgChannelId(user_id) {
         if (me && me.data && me.data.id) {
             BOT_ID = me.data.id;
         } else {
-            console.error('sendDirectMessage, cannot aquire bot id:', err);
+            console.error('sendDirectMessage, cannot aquire bot id:', me);
             throw new Error('ERR_NO_BOT_ID');
         }
     }
@@ -178,7 +178,7 @@ async function getDirectMsgChannelId(user_id) {
     ]);
 
     if (!resp || resp.statusCode != 201 || !resp.data.id) {
-        console.error('Cannot find direct channel', err, resp);
+        console.error('Cannot find direct channel', resp);
         throw new Error('ERR_NO_DIRECT_CHANNEL');
     }
     return resp.data.id;
