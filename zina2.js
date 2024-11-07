@@ -311,7 +311,7 @@ async function parseMessageCmd(text, directChannel) {
         return null;
     }
 
-    const parts = text.split(' ');
+    const parts = text.replace(/\n/g,'').split(' ');
 
     return {
         cmd: parts[1].toLowerCase(),
