@@ -299,7 +299,7 @@ async function parseMessageCmd(text, directChannel) {
     }
 
     if (directChannel) {
-        const parts = text.split(' ');
+        const parts = text.replace(/\n/g,'').split(' ');
 
         return {
             cmd: parts[0].toLowerCase(),
